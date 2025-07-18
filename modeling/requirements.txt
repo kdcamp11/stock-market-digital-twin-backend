@@ -1,5 +1,7 @@
-pandas
-pandas_ta
-scipy
 fastapi
 uvicorn
+pandas
+pyyaml
+APScheduler
+yfinance
+pandas_ta
