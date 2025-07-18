@@ -4,3 +4,4 @@ pandas
 pyyaml
 APScheduler
 yfinance
+pandas_ta
