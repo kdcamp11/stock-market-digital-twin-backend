@@ -8,6 +8,17 @@ from modeling.twin_state import TwinState
 from modeling.twin_state_query_example import load_data
 
 app = FastAPI()
+
+# --- CORS middleware for Netlify frontend ---
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://stock-market-digital-twin.netlify.app"],  # More secure, or use ["*"] for dev
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 agent = StockAgent()
 
 class DecisionRequest(BaseModel):
