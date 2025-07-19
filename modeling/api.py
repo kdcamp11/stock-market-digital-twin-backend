@@ -20,7 +20,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-agent = StockAgent()
+import os
+db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+agent = StockAgent(db_path=db_path)
 
 class DecisionRequest(BaseModel):
     question: str

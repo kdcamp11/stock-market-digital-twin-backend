@@ -6,7 +6,8 @@ from modeling.twin_state import TwinState
 from modeling.twin_state_query_example import load_data
 
 class StockAgent:
-    def __init__(self, db_path="/Users/keithcamp/Stock Market Digital Twin/data_ingestion/stocks.db"):
+    def __init__(self, db_path):
+        """StockAgent requires explicit db_path for SQLite database."""
         self.db_path = db_path
 
     def parse_goal(self, goal):
