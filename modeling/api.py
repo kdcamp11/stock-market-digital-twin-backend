@@ -11,6 +11,23 @@ import sqlite3
 
 app = FastAPI()
 
+# --- Start alert monitoring as a background thread ---
+import threading
+import time
+
+def run_alert_monitor_periodically():
+    from alerts.monitor import AlertMonitor
+    monitor = AlertMonitor(config_path="alert_config.yaml")
+    while True:
+        monitor.check_all_symbols()
+        time.sleep(600)  # Run every 10 minutes
+
+@app.on_event("startup")
+def start_alert_monitor():
+    t = threading.Thread(target=run_alert_monitor_periodically, daemon=True)
+    t.start()
+
+
 # --- CORS middleware for Netlify frontend ---
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -121,8 +138,32 @@ def run_simulation(req: SimRequest):
 
 @app.post("/api/agent")
 def agent_chat(req: AgentRequest):
+    import re
+    from modeling.twin_state_query_example import get_symbols
+    # Extract all-caps ticker symbols from the question
+    words = re.findall(r'\b[A-Z]{1,5}\b', req.question)
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+    known_symbols = set(get_symbols(db_path))
+    # Try to add missing tickers
+    for symbol in words:
+        if symbol not in known_symbols:
+            from fastapi import Request
+            import yfinance as yf, sqlite3
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (symbol,))
+            if not cursor.fetchone():
+                df = yf.download(symbol, period="max")
+                if df is not None and not df.empty:
+                    df.reset_index(inplace=True)
+                    df.columns = [c.replace(' ', '_') for c in df.columns]
+                    try:
+                        df.to_sql(symbol, conn, if_exists="replace", index=False)
+                    except Exception:
+                        pass
+            conn.close()
+    # Now make the decision (with fresh DB tickers)
     result = agent.decide(req.question)
-    # Flatten result for UI
     return {
         "decision": result.get("decision"),
         "confidence": result.get("confidence"),

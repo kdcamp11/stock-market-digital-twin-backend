@@ -11,11 +11,11 @@ class StockAgent:
         self.db_path = db_path
 
     def parse_goal(self, goal):
+        # Reload known symbols from DB every time
+        self.known_symbols = set(get_symbols(self.db_path))
         # Extract likely stock symbols (all caps, 1-5 letters, not common English words)
         words = re.findall(r'\b[A-Z]{1,5}\b', goal)
-        # For demo, allow known symbols only
-        known_symbols = {'AAPL', 'TSLA', 'MSFT'}
-        symbols = [w for w in words if w in known_symbols]
+        symbols = [w for w in words if w in self.known_symbols]
         action = None
         if 'buy' in goal.lower():
             action = 'buy'
