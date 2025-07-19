@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from modeling.agent import StockAgent
 from modeling.twin_state import TwinState
 from modeling.twin_state_query_example import load_data
+import yfinance as yf
+import sqlite3
 
 app = FastAPI()
 
@@ -33,6 +35,9 @@ class SimRequest(BaseModel):
 
 class AgentRequest(BaseModel):
     question: str
+
+class AddTickerRequest(BaseModel):
+    symbol: str
 
 @app.get("/decision")
 def get_decision(question: str = Query(..., description="Plain-language question about a stock")):
@@ -123,3 +128,30 @@ def agent_chat(req: AgentRequest):
         "confidence": result.get("confidence"),
         "explanation": result.get("explanation"),
     }
+
+@app.post("/api/add_ticker")
+def add_ticker(req: AddTickerRequest):
+    symbol = req.symbol.upper()
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+    # Check if symbol already exists
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (symbol,))
+    if cursor.fetchone():
+        conn.close()
+        return {"status": "exists", "message": f"{symbol} already in database."}
+    # Fetch data from Yahoo Finance
+    df = yf.download(symbol, period="max")
+    if df is None or df.empty:
+        conn.close()
+        return {"status": "error", "message": f"No data found for {symbol} on Yahoo Finance."}
+    # Save to SQLite
+    df.reset_index(inplace=True)
+    df.columns = [c.replace(' ', '_') for c in df.columns]
+    try:
+        df.to_sql(symbol, conn, if_exists="replace", index=False)
+        conn.close()
+        return {"status": "success", "message": f"{symbol} added to database.", "rows": len(df)}
+    except Exception as e:
+        conn.close()
+        return {"status": "error", "message": str(e)}
