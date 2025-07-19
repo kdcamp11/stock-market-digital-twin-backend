@@ -45,7 +45,8 @@ def post_decision(req: DecisionRequest):
 
 @app.get("/api/twin/latest")
 def get_latest_twin_states():
-    db_path = "/Users/keithcamp/Stock Market Digital Twin/data_ingestion/stocks.db"
+    import os
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
     from modeling.twin_state_query_example import get_symbols, load_data
     symbols = get_symbols(db_path)
     result = []
