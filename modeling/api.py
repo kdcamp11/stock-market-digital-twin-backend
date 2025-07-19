@@ -117,7 +117,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://stock-market-digital-twin.netlify.app"],  # More secure, or use ["*"] for dev
+    allow_origins=["*"],  # Allow all origins for development - restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
