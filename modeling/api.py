@@ -297,77 +297,96 @@ def add_ticker(req: AddTickerRequest):
         conn.close()
         return {"status": "error", "message": str(e)}
 
-# --- Portfolio Simulation Endpoints ---
-from modeling.portfolio import Portfolio, PortfolioSimulator, simple_rsi_strategy
+# --- Portfolio Simulation Endpoints (Optional) ---
+try:
+    from modeling.portfolio import Portfolio, PortfolioSimulator, simple_rsi_strategy
+    PORTFOLIO_AVAILABLE = True
+except ImportError:
+    PORTFOLIO_AVAILABLE = False
+    print("Portfolio simulation disabled - portfolio module not found")
 
-@app.post("/api/portfolio/create")
-def create_portfolio(req: PortfolioRequest):
-    """Create a new portfolio"""
-    try:
-        portfolio = Portfolio(req.initial_cash)
-        return {
-            "status": "success",
-            "portfolio": portfolio.to_dict()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+if PORTFOLIO_AVAILABLE:
+    @app.post("/api/portfolio/create")
+    def create_portfolio(req: PortfolioRequest):
+        """Create a new portfolio"""
+        try:
+            portfolio = Portfolio(req.initial_cash)
+            return {
+                "status": "success",
+                "portfolio": portfolio.to_dict()
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/portfolio/backtest")
-def backtest_strategy(req: BacktestRequest):
-    """Run a backtest simulation"""
-    try:
-        db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
-        simulator = PortfolioSimulator(db_path)
-        
-        if req.strategy == "agent":
-            portfolio = simulator.backtest_agent_decisions(
-                req.start_date, 
-                req.end_date, 
-                req.initial_cash
-            )
-        elif req.strategy == "rsi":
-            symbols = req.symbols if req.symbols else ["AAPL", "TSLA", "MSFT"]
-            portfolio = simulator.simulate_strategy(
-                symbols,
-                req.start_date,
-                req.end_date,
-                simple_rsi_strategy,
-                req.initial_cash
-            )
-        else:
-            raise HTTPException(status_code=400, detail="Invalid strategy. Use 'agent' or 'rsi'")
+    @app.post("/api/portfolio/backtest")
+    def backtest_strategy(req: BacktestRequest):
+        """Run a backtest simulation"""
+        try:
+            db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+            simulator = PortfolioSimulator(db_path)
             
-        return {
-            "status": "success",
-            "portfolio": portfolio.to_dict(),
-            "positions": portfolio.get_positions_summary(),
-            "transactions": portfolio.transactions[-10:]  # Last 10 transactions
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            if req.strategy == "agent":
+                portfolio = simulator.backtest_agent_decisions(
+                    req.start_date, 
+                    req.end_date, 
+                    req.initial_cash
+                )
+            elif req.strategy == "rsi":
+                symbols = req.symbols if req.symbols else ["AAPL", "TSLA", "MSFT"]
+                portfolio = simulator.simulate_strategy(
+                    symbols,
+                    req.start_date,
+                    req.end_date,
+                    simple_rsi_strategy,
+                    req.initial_cash
+                )
+            else:
+                raise HTTPException(status_code=400, detail="Invalid strategy. Use 'agent' or 'rsi'")
+                
+            return {
+                "status": "success",
+                "portfolio": portfolio.to_dict(),
+                "positions": portfolio.get_positions_summary(),
+                "transactions": portfolio.transactions[-10:]  # Last 10 transactions
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/portfolio/demo")
-def get_demo_portfolio():
-    """Get a demo portfolio with sample data"""
-    try:
-        portfolio = Portfolio(100000.0)
-        
-        # Add some sample positions
-        portfolio.buy("AAPL", 50, 150.0)
-        portfolio.buy("TSLA", 25, 200.0)
-        portfolio.buy("MSFT", 30, 300.0)
-        
-        # Update with current prices (mock data)
-        portfolio.update_prices({
-            "AAPL": 155.0,
-            "TSLA": 210.0,
-            "MSFT": 310.0
-        })
-        
-        return {
-            "status": "success",
-            "portfolio": portfolio.to_dict(),
-            "positions": portfolio.get_positions_summary()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    @app.get("/api/portfolio/demo")
+    def get_demo_portfolio():
+        """Get a demo portfolio with sample data"""
+        try:
+            portfolio = Portfolio(100000.0)
+            
+            # Add some sample positions
+            portfolio.buy("AAPL", 50, 150.0)
+            portfolio.buy("TSLA", 25, 200.0)
+            portfolio.buy("MSFT", 30, 300.0)
+            
+            # Update with current prices (mock data)
+            portfolio.update_prices({
+                "AAPL": 155.0,
+                "TSLA": 210.0,
+                "MSFT": 310.0
+            })
+            
+            return {
+                "status": "success",
+                "portfolio": portfolio.to_dict(),
+                "positions": portfolio.get_positions_summary()
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+else:
+    # Portfolio endpoints disabled - return error messages
+    @app.post("/api/portfolio/create")
+    def create_portfolio_disabled(req: PortfolioRequest):
+        return {"status": "error", "message": "Portfolio simulation not available"}
+    
+    @app.post("/api/portfolio/backtest")
+    def backtest_strategy_disabled(req: BacktestRequest):
+        return {"status": "error", "message": "Portfolio simulation not available"}
+    
+    @app.get("/api/portfolio/demo")
+    def get_demo_portfolio_disabled():
+        return {"status": "error", "message": "Portfolio simulation not available"}
