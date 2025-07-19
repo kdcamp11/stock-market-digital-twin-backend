@@ -3,7 +3,7 @@ Agentic AI layer: interprets plain-language goals/questions, reasons over twin s
 """
 import re
 from modeling.twin_state import TwinState
-from modeling.twin_state_query_example import load_data
+from modeling.twin_state_query_example import load_data, get_symbols
 
 class StockAgent:
     def __init__(self, db_path):
