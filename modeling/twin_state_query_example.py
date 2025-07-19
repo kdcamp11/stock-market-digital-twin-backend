@@ -25,8 +25,10 @@ def load_data(symbol, db_path):
     df = df.set_index('Date')
     return df
 
+import os
+
 if __name__ == "__main__":
-    db_path = "/Users/keithcamp/Stock Market Digital Twin/data_ingestion/stocks.db"
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
     symbols = get_symbols(db_path)
     print(f"Found symbols: {symbols}")
     for symbol in symbols:
