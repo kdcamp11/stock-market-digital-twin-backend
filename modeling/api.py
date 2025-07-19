@@ -11,16 +11,100 @@ import sqlite3
 
 app = FastAPI()
 
+# --- Alpaca Real-Time Data Integration ---
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+import os
+import asyncio
+import json
+try:
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import LatestQuoteRequest
+except ImportError:
+    StockHistoricalDataClient = None
+    LatestQuoteRequest = None
+
+def get_realtime_quote(symbol):
+    api_key = os.environ.get('ALPACA_API_KEY')
+    api_secret = os.environ.get('ALPACA_API_SECRET')
+    if not api_key or not api_secret:
+        raise Exception('Alpaca API credentials not set in environment variables.')
+    if StockHistoricalDataClient is None or LatestQuoteRequest is None:
+        raise Exception('alpaca-py is not installed. Please install with pip install alpaca-py')
+    client = StockHistoricalDataClient(api_key, api_secret)
+    request_params = LatestQuoteRequest(symbol_or_symbols=symbol)
+    quote = client.get_latest_quote(request_params)
+    return quote
+
+@app.get("/api/realtime/{symbol}")
+def realtime_price(symbol: str):
+    try:
+        quote = get_realtime_quote(symbol.upper())
+        return {
+            "symbol": symbol.upper(),
+            "ask": getattr(quote, 'ask_price', None),
+            "bid": getattr(quote, 'bid_price', None),
+            "timestamp": str(getattr(quote, 'timestamp', ''))
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.websocket("/ws/realtime")
+async def websocket_realtime(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        subscribe_msg = await websocket.receive_text()
+        try:
+            subscribe_data = json.loads(subscribe_msg)
+            symbols = subscribe_data.get("symbols", [])
+            if not symbols or not isinstance(symbols, list):
+                await websocket.send_text(json.dumps({"error": "Send {\"symbols\": [\"AAPL\", ...]} to subscribe."}))
+                await websocket.close()
+                return
+        except Exception:
+            await websocket.send_text(json.dumps({"error": "Invalid subscribe message. Send {\"symbols\": [\"AAPL\", ...]}"}))
+            await websocket.close()
+            return
+        last_prices = {s: None for s in symbols}
+        while True:
+            updates = []
+            for symbol in symbols:
+                try:
+                    quote = get_realtime_quote(symbol)
+                    price = getattr(quote, 'ask_price', None) or getattr(quote, 'bid_price', None)
+                    ts = str(getattr(quote, 'timestamp', ''))
+                    if price != last_prices[symbol]:
+                        updates.append({
+                            "symbol": symbol,
+                            "price": price,
+                            "timestamp": ts
+                        })
+                        last_prices[symbol] = price
+                except Exception as e:
+                    updates.append({"symbol": symbol, "error": str(e)})
+            if updates:
+                await websocket.send_text(json.dumps({"updates": updates}))
+            await asyncio.sleep(2)  # Poll every 2 seconds for demo; adjust as needed
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        await websocket.send_text(json.dumps({"error": str(e)}))
+        await websocket.close()
+
 # --- Start alert monitoring as a background thread ---
 import threading
 import time
 
 def run_alert_monitor_periodically():
-    from alerts.monitor import AlertMonitor
-    monitor = AlertMonitor(config_path="alert_config.yaml")
-    while True:
-        monitor.check_all_symbols()
-        time.sleep(600)  # Run every 10 minutes
+    try:
+        from modeling.alerts.monitor import AlertMonitor
+        monitor = AlertMonitor(config_path="alert_config.yaml")
+        while True:
+            monitor.check_all_symbols()
+            time.sleep(600)  # Run every 10 minutes
+    except ImportError:
+        # Alert monitoring is optional - skip if not available
+        print("Alert monitoring disabled - alerts module not found")
+        return
 
 @app.on_event("startup")
 def start_alert_monitor():
@@ -55,6 +139,16 @@ class AgentRequest(BaseModel):
 
 class AddTickerRequest(BaseModel):
     symbol: str
+
+class PortfolioRequest(BaseModel):
+    initial_cash: float = 100000.0
+    
+class BacktestRequest(BaseModel):
+    start_date: str
+    end_date: str
+    initial_cash: float = 100000.0
+    strategy: str = "agent"  # "agent" or "rsi"
+    symbols: list = []
 
 @app.get("/decision")
 def get_decision(question: str = Query(..., description="Plain-language question about a stock")):
@@ -156,7 +250,10 @@ def agent_chat(req: AgentRequest):
                 df = yf.download(symbol, period="max")
                 if df is not None and not df.empty:
                     df.reset_index(inplace=True)
-                    df.columns = [c.replace(' ', '_') for c in df.columns]
+                    # Handle MultiIndex columns from yfinance
+                    if hasattr(df.columns, 'levels'):  # MultiIndex
+                        df.columns = [col[0] if isinstance(col, tuple) else str(col) for col in df.columns]
+                    df.columns = [str(c).replace(' ', '_') for c in df.columns]
                     try:
                         df.to_sql(symbol, conn, if_exists="replace", index=False)
                     except Exception:
@@ -188,7 +285,10 @@ def add_ticker(req: AddTickerRequest):
         return {"status": "error", "message": f"No data found for {symbol} on Yahoo Finance."}
     # Save to SQLite
     df.reset_index(inplace=True)
-    df.columns = [c.replace(' ', '_') for c in df.columns]
+    # Handle MultiIndex columns from yfinance
+    if hasattr(df.columns, 'levels'):  # MultiIndex
+        df.columns = [col[0] if isinstance(col, tuple) else str(col) for col in df.columns]
+    df.columns = [str(c).replace(' ', '_') for c in df.columns]
     try:
         df.to_sql(symbol, conn, if_exists="replace", index=False)
         conn.close()
@@ -196,3 +296,78 @@ def add_ticker(req: AddTickerRequest):
     except Exception as e:
         conn.close()
         return {"status": "error", "message": str(e)}
+
+# --- Portfolio Simulation Endpoints ---
+from modeling.portfolio import Portfolio, PortfolioSimulator, simple_rsi_strategy
+
+@app.post("/api/portfolio/create")
+def create_portfolio(req: PortfolioRequest):
+    """Create a new portfolio"""
+    try:
+        portfolio = Portfolio(req.initial_cash)
+        return {
+            "status": "success",
+            "portfolio": portfolio.to_dict()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/portfolio/backtest")
+def backtest_strategy(req: BacktestRequest):
+    """Run a backtest simulation"""
+    try:
+        db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+        simulator = PortfolioSimulator(db_path)
+        
+        if req.strategy == "agent":
+            portfolio = simulator.backtest_agent_decisions(
+                req.start_date, 
+                req.end_date, 
+                req.initial_cash
+            )
+        elif req.strategy == "rsi":
+            symbols = req.symbols if req.symbols else ["AAPL", "TSLA", "MSFT"]
+            portfolio = simulator.simulate_strategy(
+                symbols,
+                req.start_date,
+                req.end_date,
+                simple_rsi_strategy,
+                req.initial_cash
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Invalid strategy. Use 'agent' or 'rsi'")
+            
+        return {
+            "status": "success",
+            "portfolio": portfolio.to_dict(),
+            "positions": portfolio.get_positions_summary(),
+            "transactions": portfolio.transactions[-10:]  # Last 10 transactions
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/portfolio/demo")
+def get_demo_portfolio():
+    """Get a demo portfolio with sample data"""
+    try:
+        portfolio = Portfolio(100000.0)
+        
+        # Add some sample positions
+        portfolio.buy("AAPL", 50, 150.0)
+        portfolio.buy("TSLA", 25, 200.0)
+        portfolio.buy("MSFT", 30, 300.0)
+        
+        # Update with current prices (mock data)
+        portfolio.update_prices({
+            "AAPL": 155.0,
+            "TSLA": 210.0,
+            "MSFT": 310.0
+        })
+        
+        return {
+            "status": "success",
+            "portfolio": portfolio.to_dict(),
+            "positions": portfolio.get_positions_summary()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
