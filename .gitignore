@@ -1,2 +1,48 @@
-ui/
+# Environment Variables (CRITICAL: Keep API credentials secure)
+.env
+.env.local
+.env.production
+.env.development
+
+# Database files with market data
+data_ingestion/stocks.db
+data_ingestion/*.db
+*.db
+
+# Node modules and build files
+ui/node_modules/
+ui/build/
+ui/dist/
+ui/.env
+ui/.env.local
+
+# Python cache and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+
+# IDE and system files
 .DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# API keys and secrets (extra protection)
+api_keys.txt
+secrets.json
+credentials.json

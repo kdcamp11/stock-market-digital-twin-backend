@@ -31,7 +31,13 @@ class AlpacaDataProvider:
         if StockHistoricalDataClient is None:
             raise ImportError("alpaca-py not installed. Please install with: pip install alpaca-py")
             
-        self.client = StockHistoricalDataClient(self.api_key, self.api_secret)
+        # Initialize the client with proper configuration
+        try:
+            self.client = StockHistoricalDataClient(self.api_key, self.api_secret)
+            print(f"✅ Alpaca client initialized successfully")
+        except Exception as e:
+            print(f"❌ Error initializing Alpaca client: {e}")
+            raise
         
     def get_historical_bars(self, 
                            symbol: str, 

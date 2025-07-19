@@ -1,13 +1,46 @@
 """
 REST API for agentic AI stock decision-making
 """
+import sys
+import os
+
+# Add the parent directory to the path so we can import modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from fastapi import FastAPI, Query
 from pydantic import BaseModel
-from modeling.agent import StockAgent
-from modeling.twin_state import TwinState
-from modeling.twin_state_query_example import load_data
+
+try:
+    from modeling.agent import StockAgent
+    from modeling.twin_state import TwinState
+    from modeling.twin_state_query_example import load_data
+except ImportError:
+    # If running directly, try importing from current directory
+    from agent import StockAgent
+    from twin_state import TwinState
+    from twin_state_query_example import load_data
+
 import yfinance as yf
 import sqlite3
+
+# Helper function to handle imports consistently
+def safe_import(module_name, class_or_func_name=None):
+    """Safely import modules with fallback for direct execution"""
+    try:
+        if class_or_func_name:
+            module = __import__(f'modeling.{module_name}', fromlist=[class_or_func_name])
+            return getattr(module, class_or_func_name)
+        else:
+            return __import__(f'modeling.{module_name}', fromlist=[''])
+    except ImportError:
+        try:
+            if class_or_func_name:
+                module = __import__(module_name, fromlist=[class_or_func_name])
+                return getattr(module, class_or_func_name)
+            else:
+                return __import__(module_name, fromlist=[''])
+        except ImportError:
+            return None
 
 app = FastAPI()
 
@@ -327,6 +360,284 @@ def update_all_tickers():
         
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+# --- Advanced Technical Analysis Endpoints ---
+@app.get("/api/technical/{symbol}")
+def get_technical_analysis(symbol: str, timeframe: str = "1Day"):
+    """Get comprehensive technical analysis for a symbol"""
+    try:
+        from modeling.technical_indicators import TechnicalIndicators
+        from modeling.alpaca_data import get_alpaca_data_provider
+        
+        provider = get_alpaca_data_provider()
+        if not provider:
+            return {"status": "error", "message": "Data provider not available"}
+        
+        # Get historical data
+        df = provider.get_historical_bars(symbol.upper(), timeframe=timeframe)
+        if df.empty:
+            return {"status": "error", "message": f"No data found for {symbol}"}
+        
+        # Calculate technical indicators
+        tech_indicators = TechnicalIndicators(df)
+        signals = tech_indicators.get_current_signals()
+        
+        return {
+            "status": "success",
+            "symbol": symbol.upper(),
+            "timeframe": timeframe,
+            "analysis": signals
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/backtest/{symbol}")
+def get_backtest_results(symbol: str, timeframe: str = "1Day", initial_capital: float = 100000):
+    """Get backtest results with buy/sell signals and performance"""
+    try:
+        from modeling.technical_indicators import TechnicalIndicators
+        from modeling.alpaca_data import get_alpaca_data_provider
+        
+        provider = get_alpaca_data_provider()
+        if not provider:
+            return {"status": "error", "message": "Data provider not available"}
+        
+        # Get historical data
+        df = provider.get_historical_bars(symbol.upper(), timeframe=timeframe)
+        if df.empty:
+            return {"status": "error", "message": f"No data found for {symbol}"}
+        
+        # Run backtest
+        tech_indicators = TechnicalIndicators(df)
+        backtest_results = tech_indicators.get_backtest_data(initial_capital)
+        
+        return {
+            "status": "success",
+            "symbol": symbol.upper(),
+            "timeframe": timeframe,
+            "backtest": backtest_results
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/chart/{symbol}")
+def get_chart_data(symbol: str, timeframe: str = "1Day", period: str = "6M"):
+    """Get chart data with technical indicators for visualization"""
+    try:
+        from modeling.technical_indicators import TechnicalIndicators
+        from modeling.alpaca_data import get_alpaca_data_provider
+        from datetime import datetime, timedelta
+        
+        provider = get_alpaca_data_provider()
+        if not provider:
+            return {"status": "error", "message": "Data provider not available"}
+        
+        # Calculate start date based on period
+        end_date = datetime.now()
+        period_map = {
+            "1M": 30, "3M": 90, "6M": 180, 
+            "1Y": 365, "2Y": 730, "5Y": 1825
+        }
+        days_back = period_map.get(period, 180)
+        start_date = end_date - timedelta(days=days_back)
+        
+        # Get historical data
+        df = provider.get_historical_bars(
+            symbol.upper(), 
+            start_date=start_date.strftime('%Y-%m-%d'),
+            end_date=end_date.strftime('%Y-%m-%d'),
+            timeframe=timeframe
+        )
+        
+        if df.empty:
+            return {"status": "error", "message": f"No data found for {symbol}"}
+        
+        # Calculate all indicators
+        tech_indicators = TechnicalIndicators(df)
+        df_with_indicators = tech_indicators.calculate_all_indicators()
+        
+        # Prepare chart data
+        chart_data = {
+            "symbol": symbol.upper(),
+            "timeframe": timeframe,
+            "period": period,
+            "ohlcv": df_with_indicators[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].to_dict('records'),
+            "indicators": {
+                "sma_20": df_with_indicators[['Date', 'SMA_20']].dropna().to_dict('records'),
+                "sma_50": df_with_indicators[['Date', 'SMA_50']].dropna().to_dict('records'),
+                "bollinger_bands": df_with_indicators[['Date', 'BB_Upper', 'BB_Middle', 'BB_Lower']].dropna().to_dict('records'),
+                "rsi": df_with_indicators[['Date', 'RSI']].dropna().to_dict('records'),
+                "macd": df_with_indicators[['Date', 'MACD', 'MACD_Signal', 'MACD_Histogram']].dropna().to_dict('records'),
+                "vwap": df_with_indicators[['Date', 'VWAP']].dropna().to_dict('records')
+            },
+            "signals": {
+                "buy": df_with_indicators[df_with_indicators['Final_Signal'] == 'BUY'][['Date', 'Close', 'Buy_Signals']].to_dict('records'),
+                "sell": df_with_indicators[df_with_indicators['Final_Signal'] == 'SELL'][['Date', 'Close', 'Sell_Signals']].to_dict('records')
+            }
+        }
+        
+        return {
+            "status": "success",
+            "chart_data": chart_data
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# --- Options Data Endpoints ---
+@app.get("/api/options/{symbol}")
+def get_options_chain(symbol: str, expiration: str = None):
+    """Get options chain for a symbol"""
+    try:
+        from modeling.options_data import get_options_provider
+        
+        provider = get_options_provider()
+        if not provider:
+            return {"status": "error", "message": "Options provider not available"}
+        
+        chain = provider.get_options_chain(symbol.upper(), expiration)
+        
+        return {
+            "status": "success",
+            "options_chain": chain
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/options/analysis/{symbol}")
+def get_options_analysis(symbol: str):
+    """Get comprehensive options analysis"""
+    try:
+        from modeling.options_data import get_options_provider
+        
+        provider = get_options_provider()
+        if not provider:
+            return {"status": "error", "message": "Options provider not available"}
+        
+        analysis = provider.get_options_analysis(symbol.upper())
+        
+        return {
+            "status": "success",
+            "options_analysis": analysis
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/options/strategies/{symbol}")
+def get_options_strategies(symbol: str, outlook: str = "BULLISH"):
+    """Get suggested options strategies based on market outlook"""
+    try:
+        from modeling.options_data import get_options_provider
+        
+        provider = get_options_provider()
+        if not provider:
+            return {"status": "error", "message": "Options provider not available"}
+        
+        strategies = provider.get_options_strategies(symbol.upper(), outlook.upper())
+        
+        return {
+            "status": "success",
+            "symbol": symbol.upper(),
+            "outlook": outlook.upper(),
+            "strategies": strategies
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# --- Missing Frontend Endpoints ---
+@app.get("/api/twin/latest")
+def get_latest_twin_states():
+    """Get latest twin states for all symbols"""
+    try:
+        # Get symbols from database
+        db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT symbol FROM stock_prices ORDER BY symbol")
+        symbols = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        if not symbols:
+            return {"status": "success", "data": []}
+        
+        # Get latest data for each symbol
+        twin_states = []
+        for symbol in symbols[:10]:  # Limit to first 10 for performance
+            try:
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT symbol, date, open, high, low, close, volume 
+                    FROM stock_prices 
+                    WHERE symbol = ? 
+                    ORDER BY date DESC 
+                    LIMIT 1
+                """, (symbol,))
+                row = cursor.fetchone()
+                conn.close()
+                
+                if row:
+                    twin_states.append({
+                        "symbol": row[0],
+                        "date": row[1],
+                        "open": row[2],
+                        "high": row[3],
+                        "low": row[4],
+                        "close": row[5],
+                        "volume": row[6]
+                    })
+            except Exception:
+                continue
+        
+        return {"status": "success", "data": twin_states}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/agent")
+def agent_chat(request: dict):
+    """Agent chat endpoint"""
+    try:
+        question = request.get('question', '')
+        if not question:
+            return {"status": "error", "message": "No question provided"}
+        
+        # Initialize agent
+        agent = StockAgent()
+        
+        # Get agent decision
+        result = agent.decide(question)
+        
+        return {
+            "status": "success",
+            "response": result.get('explanation', 'No explanation available'),
+            "decision": result.get('decision', 'wait'),
+            "confidence": result.get('confidence', 0.0)
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/symbols")
+def get_symbols():
+    """Get all available symbols"""
+    try:
+        db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT symbol FROM stock_prices ORDER BY symbol")
+        symbols = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        return {"status": "success", "symbols": symbols}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e), "symbols": []}
 
 # --- Portfolio Simulation Endpoints (Optional) ---
 try:
