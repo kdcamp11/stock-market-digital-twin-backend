@@ -11,6 +11,7 @@ app = FastAPI()
 
 # --- CORS middleware for Netlify frontend ---
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://stock-market-digital-twin.netlify.app"],  # More secure, or use ["*"] for dev
@@ -42,6 +43,17 @@ def post_decision(req: DecisionRequest):
     return {"question": req.question, "result": result}
 
 # --- New UI endpoints below ---
+
+@app.get("/api/debug/files")
+def list_files():
+    import os
+    dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion"))
+    try:
+        files = os.listdir(dir_path)
+        file_stats = {f: os.stat(os.path.join(dir_path, f)).st_mode for f in files}
+        return JSONResponse({"dir": dir_path, "files": files, "file_stats": file_stats})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "dir": dir_path})
 
 @app.get("/api/twin/latest")
 def get_latest_twin_states():
