@@ -7,3 +7,4 @@ APScheduler
 yfinance
 pandas_ta
 setuptools
+alpaca-py>=0.13.0

@@ -1,0 +1,11 @@
+symbols:
+  - AAPL
+  - MSFT
+  - TSLA
+start_date: '2022-01-01'
+end_date: '2023-01-01'
+interval: '1d'  # Options: 1d, 1h, 5m, etc.
+update_schedule:
+  type: interval  # options: interval or cron
+  hours: 1        # if interval, how often to update (every 1 hour)
+  # cron: '0 9 * * 1-5'  # if cron, use standard cron syntax for weekdays at 9am

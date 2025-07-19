@@ -35,20 +35,37 @@ class StockAgent:
         if not symbols:
             return {'decision': 'wait', 'confidence': 0.0, 'explanation': 'No symbol found in request.'}
         results = {}
+        # Import real-time quote function from api.py
+        try:
+            from modeling.api import get_realtime_quote
+        except ImportError:
+            get_realtime_quote = None
         for symbol in symbols:
+            realtime_price = None
+            realtime_note = ""
+            # Try to get real-time price
+            if get_realtime_quote:
+                try:
+                    quote = get_realtime_quote(symbol)
+                    realtime_price = getattr(quote, 'ask_price', None) or getattr(quote, 'bid_price', None)
+                    ts = getattr(quote, 'timestamp', None)
+                    if realtime_price is not None:
+                        realtime_note = f" [Alpaca real-time price: {realtime_price} @ {ts}]"
+                except Exception as e:
+                    realtime_note = f" [Real-time price unavailable: {e}]"
             state = self.get_twin_state(symbol)
             if state is None:
                 results[symbol] = {
                     'decision': 'wait',
                     'confidence': 0.0,
-                    'explanation': f'No data found for {symbol}.'
+                    'explanation': f'No data found for {symbol}.{realtime_note}'
                 }
                 continue
             decision, confidence, explanation = self.reason(state)
             results[symbol] = {
                 'decision': decision,
                 'confidence': confidence,
-                'explanation': explanation
+                'explanation': explanation + realtime_note
             }
         return results if len(results) > 1 else list(results.values())[0]
 

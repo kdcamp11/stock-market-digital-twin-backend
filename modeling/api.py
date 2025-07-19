@@ -16,29 +16,37 @@ from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 import os
 import asyncio
 import json
-try:
-    from alpaca.data.historical import StockHistoricalDataClient
-    from alpaca.data.requests import LatestQuoteRequest
-except ImportError:
-    StockHistoricalDataClient = None
-    LatestQuoteRequest = None
 
-def get_realtime_quote(symbol):
-    api_key = os.environ.get('ALPACA_API_KEY')
-    api_secret = os.environ.get('ALPACA_API_SECRET')
-    if not api_key or not api_secret:
-        raise Exception('Alpaca API credentials not set in environment variables.')
-    if StockHistoricalDataClient is None or LatestQuoteRequest is None:
-        raise Exception('alpaca-py is not installed. Please install with pip install alpaca-py')
-    client = StockHistoricalDataClient(api_key, api_secret)
-    request_params = LatestQuoteRequest(symbol_or_symbols=symbol)
-    quote = client.get_latest_quote(request_params)
-    return quote
+def get_realtime_quote(symbol: str):
+    """Get real-time quote from Alpaca using new data provider"""
+    try:
+        from modeling.alpaca_data import get_alpaca_data_provider
+        provider = get_alpaca_data_provider()
+        if provider:
+            return provider.get_latest_quote(symbol)
+        return None
+    except Exception as e:
+        print(f"Error fetching real-time quote for {symbol}: {e}")
+        return None
+
+def get_realtime_trade(symbol: str):
+    """Get real-time trade from Alpaca"""
+    try:
+        from modeling.alpaca_data import get_alpaca_data_provider
+        provider = get_alpaca_data_provider()
+        if provider:
+            return provider.get_latest_trade(symbol)
+        return None
+    except Exception as e:
+        print(f"Error fetching real-time trade for {symbol}: {e}")
+        return None
 
 @app.get("/api/realtime/{symbol}")
 def realtime_price(symbol: str):
     try:
         quote = get_realtime_quote(symbol.upper())
+        if quote is None:
+            raise Exception("Failed to fetch real-time quote")
         return {
             "symbol": symbol.upper(),
             "ask": getattr(quote, 'ask_price', None),
@@ -69,16 +77,30 @@ async def websocket_realtime(websocket: WebSocket):
             updates = []
             for symbol in symbols:
                 try:
+                    # Try to get both quote and trade data
                     quote = get_realtime_quote(symbol)
-                    price = getattr(quote, 'ask_price', None) or getattr(quote, 'bid_price', None)
-                    ts = str(getattr(quote, 'timestamp', ''))
-                    if price != last_prices[symbol]:
+                    trade = get_realtime_trade(symbol)
+                    
+                    # Prefer trade price, fallback to quote
+                    price = None
+                    timestamp = None
+                    
+                    if trade and trade.get('price'):
+                        price = trade['price']
+                        timestamp = str(trade.get('timestamp', ''))
+                    elif quote and (quote.get('ask_price') or quote.get('bid_price')):
+                        price = quote.get('ask_price') or quote.get('bid_price')
+                        timestamp = str(quote.get('timestamp', ''))
+                    
+                    if price and price != last_prices.get(symbol):
                         updates.append({
                             "symbol": symbol,
                             "price": price,
-                            "timestamp": ts
+                            "timestamp": timestamp,
+                            "type": "trade" if trade else "quote"
                         })
                         last_prices[symbol] = price
+                        
                 except Exception as e:
                     updates.append({"symbol": symbol, "error": str(e)})
             if updates:
@@ -269,32 +291,41 @@ def agent_chat(req: AgentRequest):
 
 @app.post("/api/add_ticker")
 def add_ticker(req: AddTickerRequest):
+    """Add a new ticker to the database using Alpaca data"""
     symbol = req.symbol.upper()
     db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
-    # Check if symbol already exists
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (symbol,))
-    if cursor.fetchone():
-        conn.close()
-        return {"status": "exists", "message": f"{symbol} already in database."}
-    # Fetch data from Yahoo Finance
-    df = yf.download(symbol, period="max")
-    if df is None or df.empty:
-        conn.close()
-        return {"status": "error", "message": f"No data found for {symbol} on Yahoo Finance."}
-    # Save to SQLite
-    df.reset_index(inplace=True)
-    # Handle MultiIndex columns from yfinance
-    if hasattr(df.columns, 'levels'):  # MultiIndex
-        df.columns = [col[0] if isinstance(col, tuple) else str(col) for col in df.columns]
-    df.columns = [str(c).replace(' ', '_') for c in df.columns]
+    
     try:
-        df.to_sql(symbol, conn, if_exists="replace", index=False)
-        conn.close()
-        return {"status": "success", "message": f"{symbol} added to database.", "rows": len(df)}
+        from modeling.alpaca_data import get_alpaca_data_provider
+        provider = get_alpaca_data_provider()
+        if not provider:
+            return {"status": "error", "message": "Alpaca data provider not available"}
+        
+        result = provider.add_new_symbol_to_database(db_path, symbol)
+        return result
+        
     except Exception as e:
-        conn.close()
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/update_all_tickers")
+def update_all_tickers():
+    """Update all existing tickers with fresh Alpaca data"""
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+    
+    try:
+        from modeling.alpaca_data import get_alpaca_data_provider
+        provider = get_alpaca_data_provider()
+        if not provider:
+            return {"status": "error", "message": "Alpaca data provider not available"}
+        
+        result = provider.update_database_with_alpaca_data(db_path)
+        return {
+            "status": "success",
+            "message": "Database updated with fresh Alpaca data",
+            "details": result
+        }
+        
+    except Exception as e:
         return {"status": "error", "message": str(e)}
 
 # --- Portfolio Simulation Endpoints (Optional) ---
