@@ -87,7 +87,9 @@ def run_simulation(req: SimRequest):
     from modeling.twin_state_query_example import load_data
     from modeling.simulation.simulator import StrategySimulator
     from modeling.simulation.strategies import ema_bounce_strategy
-    df = load_data(req.symbol, "/Users/keithcamp/Stock Market Digital Twin/data_ingestion/stocks.db")
+    import os
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data_ingestion/stocks.db"))
+    df = load_data(req.symbol, db_path)
     if df is None or df.empty:
         return {"error": "No data found for symbol"}
     # Enrich with indicators if needed
