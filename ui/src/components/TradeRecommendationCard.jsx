@@ -21,8 +21,8 @@ const TradeRecommendationCard = ({ symbol }) => {
       const result = await response.json();
       
       if (result.status === 'success') {
-        setRecommendation(result.data);
-        console.log('Trade recommendation loaded:', result.data);
+        setRecommendation(result.recommendation);
+        console.log('Trade recommendation loaded:', result.recommendation);
       } else {
         console.log('API failed, using mock recommendation for', symbol);
         setRecommendation(generateMockRecommendation(symbol));
