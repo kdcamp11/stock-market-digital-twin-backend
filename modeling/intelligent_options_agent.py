@@ -378,6 +378,13 @@ class IntelligentOptionsAgent:
         """
         STEP 2: Pull Live Options Chain via Tradier API
         """
+        # Debug: Check Tradier API status
+        print(f"DEBUG: Tradier provider exists: {self.tradier_provider is not None}")
+        if self.tradier_provider:
+            print(f"DEBUG: Tradier API available: {self.tradier_provider.is_available()}")
+            print(f"DEBUG: API token configured: {bool(self.tradier_provider.api_token)}")
+            print(f"DEBUG: Using sandbox: {self.tradier_provider.use_sandbox}")
+        
         if self.tradier_provider and self.tradier_provider.is_available():
             try:
                 # Get real-time options chain
@@ -564,6 +571,10 @@ class IntelligentOptionsAgent:
                     'trend': analysis['trend_direction'],
                     'confidence': analysis['confidence'],
                     'signals_aligned': analysis['signals_aligned'],
+                    'total_signals': analysis.get('total_signals', 0),
+                    'bullish_signals': analysis.get('bullish_signals', 0),
+                    'bearish_signals': analysis.get('bearish_signals', 0),
+                    'all_signals': analysis.get('all_signals', []),
                     'explanation': analysis['explanation'],
                     'analysis_date': analysis.get('analysis_date'),
                     'last_trading_day': analysis.get('last_trading_day')
@@ -580,3 +591,45 @@ intelligent_agent = IntelligentOptionsAgent()
 def get_intelligent_options_recommendation(symbol: str) -> Dict:
     """Get intelligent options trading recommendation"""
     return intelligent_agent.generate_recommendation(symbol)
+
+def get_comprehensive_signals_analysis(symbol: str) -> Dict:
+    """Get comprehensive signals analysis for both Active Signals and Options Analysis panels"""
+    try:
+        # Step 1: Analyze chart to get all signals
+        analysis = intelligent_agent.analyze_stock_chart(symbol)
+        if 'error' in analysis:
+            return analysis
+        
+        # Step 2: Format comprehensive signals response
+        return {
+            'symbol': symbol,
+            'signals': {
+                'trend': analysis['trend_direction'],
+                'confidence': analysis['confidence'],
+                'strength': analysis['strength'],
+                'total_signals': analysis.get('total_signals', 0),
+                'bullish_signals': analysis.get('bullish_signals', 0),
+                'bearish_signals': analysis.get('bearish_signals', 0),
+                'signals_aligned': analysis['signals_aligned'],
+                'all_signals': analysis.get('all_signals', []),
+                'recommendation': analysis['recommendation'],
+                'explanation': analysis['explanation']
+            },
+            'indicators': {
+                'RSI': analysis.get('RSI'),
+                'MACD': analysis.get('MACD'),
+                'MACD_Signal': analysis.get('MACD_Signal'),
+                'EMA_9': analysis.get('EMA_9'),
+                'EMA_20': analysis.get('EMA_20'),
+                'SMA_50': analysis.get('SMA_50'),
+                'SMA_200': analysis.get('SMA_200'),
+                'VWAP': analysis.get('VWAP'),
+                'current_price': analysis.get('current_price')
+            },
+            'timestamp': datetime.now().isoformat(),
+            'analysis_date': analysis.get('analysis_date'),
+            'last_trading_day': analysis.get('last_trading_day')
+        }
+        
+    except Exception as e:
+        return {'error': f'Signals analysis failed: {str(e)}'}

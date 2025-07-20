@@ -193,83 +193,105 @@ const EnhancedDashboard = () => {
           console.log('Live Dashboard: No chart data available - backend connection required');
         }
         
-        // Try to fetch technical data from backend first (to match Technical Analysis panel)
-        console.log('Live Dashboard: Fetching technical data from backend for', selectedSymbol);
+        // Fetch comprehensive signals data from unified endpoint
         try {
-          const technicalResponse = await fetch(buildApiUrl(`/api/technical/${selectedSymbol}`));
-          if (technicalResponse.ok) {
-            const technicalDataResponse = await technicalResponse.json();
-            if (technicalDataResponse.status === 'success') {
-              console.log('Live Dashboard: Backend technical data received:', technicalDataResponse);
+          const signalsResponse = await fetch(buildApiUrl(`/api/signals/${selectedSymbol}`));
+          if (signalsResponse.ok) {
+            const signalsData = await signalsResponse.json();
+            console.log('Live Dashboard: Unified signals data fetched:', signalsData);
+            
+            if (signalsData.status === 'success' && signalsData.data) {
+              const analysis = signalsData.data;
+              
+              // Format signals for display
+              const formattedSignals = analysis.signals.all_signals.map(signal => ({
+                type: signal,
+                description: signal,
+                strength: analysis.signals.confidence >= 4 ? 'high' : 
+                         analysis.signals.confidence >= 2 ? 'medium' : 'low'
+              }));
+              
+              // Set technical data with unified backend signals
               setTechnicalData({
-                indicators: technicalDataResponse.indicators,
-                signals: technicalDataResponse.signals,
-                timestamp: technicalDataResponse.timestamp,
-                symbol: technicalDataResponse.symbol
+                indicators: analysis.indicators || {},
+                signals: formattedSignals,
+                confidence: analysis.signals.confidence,
+                trend: analysis.signals.trend,
+                recommendation: analysis.signals.recommendation,
+                total_signals: analysis.signals.total_signals,
+                bullish_signals: analysis.signals.bullish_signals,
+                bearish_signals: analysis.signals.bearish_signals,
+                timestamp: analysis.timestamp,
+                symbol: selectedSymbol
               });
-              setActiveSignals(technicalDataResponse.signals || []);
+              setActiveSignals(formattedSignals);
               
-              // Calculate signal strength using tiered confirmation logic
-              if (technicalDataResponse.signals && technicalDataResponse.signals.length > 0) {
-                const strength = calculateSignalStrength(technicalDataResponse.signals);
-                setSignalStrength(strength);
-                console.log('Live Dashboard: Signal strength calculated:', strength);
-              }
+              // Set signal strength based on backend analysis
+              setSignalStrength({
+                overall: analysis.signals.trend,
+                confidence: analysis.signals.confidence,
+                strength: analysis.signals.strength
+              });
               
-              console.log('Live Dashboard: Using backend signals:', technicalDataResponse.signals?.length || 0);
-            } else {
-              throw new Error('Backend technical analysis failed');
+              console.log('Live Dashboard: Processed unified signals:', {
+                signals: formattedSignals,
+                confidence: analysis.signals.confidence,
+                trend: analysis.signals.trend
+              });
             }
           } else {
-            throw new Error('Backend technical API not available');
-          }
-        } catch (backendError) {
-          console.log('Live Dashboard: Backend failed, using frontend calculations:', backendError.message);
-          
-          // Fallback to frontend calculations - use chart data or generate fallback data
-          const fallbackData = generateMockChartData(selectedSymbol, realTimePrice || 100);
-          const dataForCalculation = chartData && chartData.length > 0 ? chartData : fallbackData;
-          if (dataForCalculation && dataForCalculation.length > 0) {
-            const { indicators, signals } = calculateAllIndicators(dataForCalculation);
-            console.log('Live Dashboard: Calculated indicators:', Object.keys(indicators));
-            console.log('Live Dashboard: Generated signals:', signals.length);
+            console.log('Live Dashboard: Unified signals API not available, using fallback');
             
-            // Get latest values for key indicators
-            const latestIndex = dataForCalculation.length - 1;
-            const keyIndicators = {
-              Current_Price: dataForCalculation[latestIndex]?.close,
-              RSI: indicators.rsi?.[latestIndex],
-              MACD: indicators.macd?.macd?.[latestIndex],
-              MACD_Signal: indicators.macd?.signal?.[latestIndex],
-              EMA_9: indicators.ema9?.[latestIndex],
-              EMA_20: indicators.ema20?.[latestIndex],
-              EMA_50: indicators.ema50?.[latestIndex],
-              VWAP: indicators.vwap?.[latestIndex],
-              BB_upper: indicators.bb?.upper?.[latestIndex],
-              BB_lower: indicators.bb?.lower?.[latestIndex],
-              ATR: indicators.atr?.[latestIndex]
-            };
-            
-            setTechnicalData({
-              indicators: keyIndicators,
-              signals: signals,
-              timestamp: new Date().toISOString(),
-              symbol: selectedSymbol
-            });
-            setActiveSignals(signals);
-            
-            // Calculate signal strength using tiered confirmation logic
-            if (signals && signals.length > 0) {
+            // Fallback: Calculate signals from chart data if available
+            if (chartData && chartData.length > 0) {
+              const indicators = calculateAllIndicators(chartData);
+              const latestIndex = chartData.length - 1;
+              
+              // Generate signals based on latest indicators
+              const signals = [];
+              
+              // RSI signals
+              if (indicators.rsi && indicators.rsi[latestIndex]) {
+                const rsi = indicators.rsi[latestIndex];
+                if (rsi > 70) {
+                  signals.push({ type: 'RSI Overbought', description: 'BEARISH HIGH', strength: 'high' });
+                } else if (rsi < 30) {
+                  signals.push({ type: 'RSI Oversold', description: 'BULLISH HIGH', strength: 'high' });
+                } else if (rsi > 55) {
+                  signals.push({ type: 'RSI Bullish', description: 'BULLISH MEDIUM', strength: 'medium' });
+                } else if (rsi < 45) {
+                  signals.push({ type: 'RSI Bearish', description: 'BEARISH MEDIUM', strength: 'medium' });
+                }
+              }
+              
+              // Store key indicators for display
+              const keyIndicators = {
+                RSI: indicators.rsi?.[latestIndex],
+                MACD: indicators.macd?.MACD?.[latestIndex],
+                EMA_9: indicators.ema9?.[latestIndex],
+                EMA_20: indicators.ema20?.[latestIndex],
+                EMA_50: indicators.ema50?.[latestIndex],
+                VWAP: indicators.vwap?.[latestIndex]
+              };
+              
+              setTechnicalData({
+                indicators: keyIndicators,
+                signals: signals,
+                confidence: signals.length,
+                timestamp: new Date().toISOString(),
+                symbol: selectedSymbol
+              });
+              setActiveSignals(signals);
+              
+              // Calculate signal strength using the signals
               const strength = calculateSignalStrength(signals);
               setSignalStrength(strength);
-              console.log('Live Dashboard: Frontend signal strength calculated:', strength);
+              
+              console.log('Live Dashboard: Generated fallback signals from chart data:', signals);
             }
-            
-            console.log('Live Dashboard: Frontend technical data calculated and set:', {
-              indicators: keyIndicators,
-              signalsCount: signals.length
-            });
           }
+        } catch (signalsError) {
+          console.error('Live Dashboard: Error fetching signals data:', signalsError);
         }
 
         // Load trade recommendation from backend API
@@ -570,14 +592,10 @@ const EnhancedDashboard = () => {
 
           
           {/* Signal Strength Display */}
-          {signalStrength && (
+          {technicalData && (
             <div className={`mb-3 p-3 rounded border ${
-              signalStrength.strength.includes('STRONG BUY') ? 'bg-green-900/20 border-green-600' :
-              signalStrength.strength.includes('MODERATE BUY') ? 'bg-green-900/10 border-green-700' :
-              signalStrength.strength.includes('WEAK BUY') ? 'bg-green-900/5 border-green-800' :
-              signalStrength.strength.includes('STRONG SELL') ? 'bg-red-900/20 border-red-600' :
-              signalStrength.strength.includes('MODERATE SELL') ? 'bg-red-900/10 border-red-700' :
-              signalStrength.strength.includes('WEAK SELL') ? 'bg-red-900/5 border-red-800' :
+              technicalData.trend === 'BULLISH' ? 'bg-green-900/10 border-green-700' :
+              technicalData.trend === 'BEARISH' ? 'bg-red-900/10 border-red-700' :
               'bg-yellow-900/20 border-yellow-600'
             }`}>
               <div className="flex items-center justify-between mb-2">
@@ -585,23 +603,24 @@ const EnhancedDashboard = () => {
                   className="text-sm font-medium px-2 py-1 rounded"
                   style={{
                     backgroundColor: 
-                      signalStrength.strength.includes('STRONG BUY') ? '#16a34a' :
-                      signalStrength.strength.includes('MODERATE BUY') ? '#15803d' :
-                      signalStrength.strength.includes('WEAK BUY') ? '#166534' :
-                      signalStrength.strength.includes('STRONG SELL') ? '#dc2626' :
-                      signalStrength.strength.includes('MODERATE SELL') ? '#ef4444' :
-                      signalStrength.strength.includes('WEAK SELL') ? '#991b1b' :
+                      technicalData.trend === 'BULLISH' ? '#15803d' :
+                      technicalData.trend === 'BEARISH' ? '#ef4444' :
                       '#ca8a04',
                     color: '#ffffff',
                     fontWeight: '600'
                   }}>
-                  {signalStrength.strength}
+                  {technicalData.trend === 'BULLISH' ? 'MODERATE BUY' : technicalData.trend === 'BEARISH' ? 'MODERATE SELL' : 'WAIT'}
                 </span>
                 <div className="text-xs" style={{ color: 'var(--text-primary)' }}>
-                  {signalStrength.totalSignals} signals
+                  Confidence: {technicalData.confidence || 0}/5
                 </div>
               </div>
-              <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{signalStrength.description}</div>
+              <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                {technicalData.total_signals || activeSignals.length} signals
+                {technicalData.bullish_signals !== undefined && technicalData.bearish_signals !== undefined && 
+                  ` (${technicalData.bullish_signals} bullish, ${technicalData.bearish_signals} bearish)`
+                }
+              </div>
               <div className="flex justify-between mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 <span>↗ {signalStrength.bullishCount}</span>
                 <span>↘ {signalStrength.bearishCount}</span>
@@ -640,7 +659,26 @@ const EnhancedDashboard = () => {
                 </div>
               ))
             ) : (
-              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>No active signals detected</div>
+              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                <h3 className="text-xl text-bold" style={{ color: 'var(--text-primary)' }}>Active Signals</h3>
+                <div className="signal-summary" style={{ marginBottom: '1rem', color: 'var(--text-secondary)' }}>
+                  {technicalData ? (
+                    <>
+                      <div className="signal-strength" style={{ fontSize: '1.1rem', fontWeight: 'bold', color: technicalData.trend === 'BULLISH' ? '#10b981' : technicalData.trend === 'BEARISH' ? '#ef4444' : '#6b7280' }}>
+                        {technicalData.trend === 'BULLISH' ? 'MODERATE BUY' : technicalData.trend === 'BEARISH' ? 'MODERATE SELL' : 'WAIT'}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                        {technicalData.total_signals || activeSignals.length} signals
+                      </div>
+                      <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                        {technicalData.bullish_signals || 0} bullish, {technicalData.bearish_signals || 0} bearish - confidence {technicalData.confidence || 0}/5
+                      </div>
+                    </>
+                  ) : (
+                    <div>Loading signals...</div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>

@@ -1221,3 +1221,46 @@ def get_current_price_alt(symbol: str):
     symbol = symbol.upper().strip()
     # Use the existing get_current_price function
     return get_current_price(symbol)
+
+@app.get("/api/signals/{symbol}")
+def get_comprehensive_signals(symbol: str):
+    """Get comprehensive signals analysis for both Active Signals and Options Analysis panels"""
+    try:
+        # Normalize symbol to uppercase for consistency
+        symbol = symbol.upper().strip()
+        
+        # Import the comprehensive signals analysis function
+        from modeling.intelligent_options_agent import get_comprehensive_signals_analysis
+        
+        # Get comprehensive signals analysis
+        analysis = get_comprehensive_signals_analysis(symbol)
+        
+        if 'error' in analysis:
+            return {
+                "status": "error",
+                "symbol": symbol,
+                "message": analysis['error'],
+                "timestamp": pd.Timestamp.now().isoformat()
+            }
+        
+        return {
+            "status": "success",
+            "symbol": symbol,
+            "data": analysis,
+            "timestamp": pd.Timestamp.now().isoformat()
+        }
+        
+    except ImportError as e:
+        return {
+            "status": "error",
+            "symbol": symbol.upper() if 'symbol' in locals() else "UNKNOWN",
+            "message": "Signals analysis not available - missing dependencies",
+            "timestamp": pd.Timestamp.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "symbol": symbol.upper() if 'symbol' in locals() else "UNKNOWN",
+            "message": f"Signals analysis failed: {str(e)}",
+            "timestamp": pd.Timestamp.now().isoformat()
+        }
