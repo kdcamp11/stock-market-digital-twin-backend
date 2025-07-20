@@ -29,8 +29,7 @@ const TradeRecommendationCard = ({ symbol }) => {
       }
     } catch (err) {
       console.error('Trade recommendation error:', err);
-      console.log('API failed, using mock recommendation for', symbol);
-      setRecommendation(generateMockRecommendation(symbol));
+      setError('Backend connection required for live options data. Please ensure your backend server is running and accessible.');
     } finally {
       setLoading(false);
     }

@@ -80,15 +80,18 @@ const AgentChatPanel = () => {
     } catch (error) {
       console.error('Agent API error:', error);
       
-      // Enhanced fallback with intelligent mock responses
-      const mockResponse = generateMockAgentResponse(question);
-      const errorMessage = { 
-        type: 'agent', 
-        content: mockResponse, 
-        timestamp: new Date(),
-        symbols: extractSymbols(question)
-      };
-      setChatHistory(prev => [...prev, errorMessage]);
+      // Show backend connection required message
+      setChatHistory(prev => [...prev, 
+        { type: 'user', content: question },
+        { type: 'agent', 
+          content: {
+            message: 'Backend connection required for live agent analysis. Please ensure your backend server is running and accessible.',
+            recommendation: 'BACKEND_REQUIRED',
+            confidence: 0
+          }, 
+          timestamp: new Date().toLocaleTimeString() 
+        }
+      ]);
     }
     setLoading(false);
     setQuestion('');

@@ -188,12 +188,9 @@ const EnhancedDashboard = () => {
             throw new Error(`Chart API returned ${chartResponse.status}`);
           }
         } catch (chartError) {
-          console.log('Live Dashboard: Chart API failed, generating mock data:', chartError.message);
-          
-          // Generate mock chart data for demonstration
-          const mockData = generateMockChartData(selectedSymbol, realTimePrice || 100);
-          console.log('Live Dashboard: Using mock chart data:', mockData.length, 'items');
-          setChartData(mockData);
+          console.log('Live Dashboard: Chart API failed:', chartError.message);
+          setChartData([]);
+          console.log('Live Dashboard: No chart data available - backend connection required');
         }
         
         // Try to fetch technical data from backend first (to match Technical Analysis panel)
@@ -306,36 +303,8 @@ const EnhancedDashboard = () => {
         const ask = (premiumValue + bidAskSpread / 2).toFixed(2);
         const midPrice = ((parseFloat(bid) + parseFloat(ask)) / 2).toFixed(2);
         
-        const mockOptionsData = {
-          symbol: selectedSymbol,
-          recommendation: rsi < 40 ? 'CALL' : rsi > 60 ? 'PUT' : 'WAIT',
-          confidence: Math.abs(rsi - 50) + 25, // Higher confidence when RSI is extreme
-          reasoning: `Technical Analysis: RSI ${rsi?.toFixed(1)} ${rsi < 40 ? '(oversold - bullish signal)' : rsi > 60 ? '(overbought - bearish signal)' : '(neutral)'}, Current Price $${currentPrice.toFixed(2)}`,
-          contract: {
-            type: rsi < 40 ? 'CALL' : 'PUT',
-            strike: otm_strike.toFixed(2),
-            expiration: nearestFridayExpiration(),
-            premium: midPrice, // Use mid price as the main premium
-            bid: bid,
-            ask: ask,
-            delta: rsi < 40 ? '0.35' : '-0.35', // Realistic delta for OTM options
-            volume: Math.floor(Math.random() * 2000 + 500).toLocaleString(),
-            openInterest: Math.floor(Math.random() * 5000 + 1000).toLocaleString()
-          },
-          entry: currentPrice.toFixed(2),
-          target: rsi < 40 ? (currentPrice * 1.08).toFixed(2) : (currentPrice * 0.92).toFixed(2),
-          stopLoss: rsi < 40 ? (currentPrice * 0.96).toFixed(2) : (currentPrice * 1.04).toFixed(2),
-          // Add bid/ask to trade plan
-          tradePlan: {
-            entryBid: bid,
-            entryAsk: ask,
-            entryMid: midPrice,
-            recommendation: `Buy at ${bid} or better (avoid paying full ask of ${ask})`
-          }
-        };
-        
-        setTradeRecommendation(mockOptionsData);
-        console.log('Live Dashboard: Mock options data set:', mockOptionsData);
+        setTradeRecommendation(null);
+        console.log('Live Dashboard: No options data available - backend connection required');
       } catch (error) {
         console.log('Data loading error:', error);
         // Set fallback data
