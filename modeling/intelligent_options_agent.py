@@ -62,7 +62,8 @@ class IntelligentOptionsAgent:
             last_trading_day = self._get_last_trading_day()
             
             # Get OHLCV data from database up to last trading day
-            conn = sqlite3.connect('data_ingestion/stocks.db')
+            db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../data_ingestion/stocks.db'))
+            conn = sqlite3.connect(db_path)
             query = '''
             SELECT Date, Open, High, Low, Close, Volume 
             FROM stock_prices 
@@ -614,7 +615,7 @@ def get_comprehensive_signals_analysis(symbol: str) -> Dict:
             'signals': {
                 'trend': analysis['trend_direction'],
                 'confidence': analysis['confidence'],
-                'strength': analysis['strength'],
+                'strength': analysis['trend_strength'],
                 'total_signals': analysis.get('total_signals', 0),
                 'bullish_signals': analysis.get('bullish_signals', 0),
                 'bearish_signals': analysis.get('bearish_signals', 0),

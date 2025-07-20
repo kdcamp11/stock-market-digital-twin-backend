@@ -1,0 +1,21 @@
+# Example alert config
+symbols:
+  AAPL:
+    - name: MACD Bullish Crossover
+      condition: macd_bullish_crossover
+      confidence: macd_confidence
+      summary: macd_summary
+      simulate_trade: true
+      min_confidence: 0.7
+  TSLA:
+    - name: RSI Oversold
+      condition: rsi_oversold
+      confidence: rsi_confidence
+      summary: rsi_summary
+      simulate_trade: false
+      min_confidence: 0.8
+channels:
+  - console
+check_interval: 300
+alert_log: alerts.log
+db_path: /Users/keithcamp/Stock Market Digital Twin/data_ingestion/stocks.db
