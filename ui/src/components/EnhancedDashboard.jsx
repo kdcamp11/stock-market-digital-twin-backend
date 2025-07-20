@@ -241,6 +241,7 @@ const EnhancedDashboard = () => {
             }
           } else {
             console.log('Live Dashboard: Unified signals API not available, using fallback');
+            console.error('Signals API Response:', signalsResponse.status, signalsResponse.statusText);
             
             // Fallback: Calculate signals from chart data if available
             if (chartData && chartData.length > 0) {
@@ -292,6 +293,7 @@ const EnhancedDashboard = () => {
           }
         } catch (signalsError) {
           console.error('Live Dashboard: Error fetching signals data:', signalsError);
+          console.error('Live Dashboard: Signals API failed - no fallback data will be shown');
         }
 
         // Load trade recommendation from backend API
