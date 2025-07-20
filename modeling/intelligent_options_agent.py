@@ -206,23 +206,41 @@ class IntelligentOptionsAgent:
                     signals.append("MACD < Signal (Bearish)")
                     bearish_signals += 1
             
-            # RSI Analysis
+            # RSI Analysis (CRITICAL - was missing!)
             if indicators.get('RSI'):
                 rsi = indicators['RSI']
                 if rsi > 70:
-                    signals.append("RSI Overbought (Bearish)")
+                    signals.append("RSI Overbought")
                     bearish_signals += 1
                 elif rsi < 30:
-                    signals.append("RSI Oversold (Bullish)")
+                    signals.append("RSI Oversold")
                     bullish_signals += 1
-                elif 45 < rsi < 55:
-                    signals.append("RSI Neutral")
-                elif rsi > 50:
-                    signals.append("RSI Above 50 (Bullish)")
-                    bullish_signals += 0.5
+                elif rsi > 55:
+                    signals.append("BULLISH MEDIUM")
+                    bullish_signals += 1
+                elif rsi < 45:
+                    signals.append("BEARISH MEDIUM")
+                    bearish_signals += 1
+            
+            # Golden Cross / Death Cross Analysis
+            if indicators.get('SMA_50') and indicators.get('SMA_200'):
+                if indicators['SMA_50'] > indicators['SMA_200']:
+                    signals.append("Golden Cross (Recent)")
+                    bullish_signals += 1
                 else:
-                    signals.append("RSI Below 50 (Bearish)")
-                    bearish_signals += 0.5
+                    signals.append("Death Cross")
+                    bearish_signals += 1
+            
+            # VWAP Zone Analysis
+            if indicators.get('VWAP') and current_price:
+                vwap_diff_pct = ((current_price - indicators['VWAP']) / indicators['VWAP']) * 100
+                if abs(vwap_diff_pct) <= 1.0:  # Within 1% of VWAP
+                    if vwap_diff_pct > 0:
+                        signals.append("VWAP Upper Zone")
+                        signals.append("CAUTION MEDIUM")
+                    else:
+                        signals.append("VWAP Lower Zone")
+                        signals.append("CAUTION MEDIUM")
             
             # TTM Squeeze
             if indicators.get('TTM_Squeeze'):
@@ -503,47 +521,23 @@ class IntelligentOptionsAgent:
                 # Fallback to whichever is available
                 best_contract = best_call_contract or best_put_contract
             
-            # If no real contracts available, create fallback contract data
+            # If no real contracts available, return error instead of mock data
             if not best_contract:
-                # Create fallback contract based on current price and recommendation
-                current_price = analysis.get('current_price', 100)
-                if primary_type == 'CALL':
-                    fallback_strike = round(current_price * 1.05)  # 5% OTM call
-                    fallback_ask = round(current_price * 0.02, 2)  # ~2% of stock price
-                else:
-                    fallback_strike = round(current_price * 0.95)  # 5% OTM put  
-                    fallback_ask = round(current_price * 0.02, 2)  # ~2% of stock price
-                
-                best_contract = {
-                    'symbol': f'{symbol}_FALLBACK',
-                    'strike': fallback_strike,
-                    'type': primary_type,
-                    'expiration': '2025-08-15',  # Next monthly expiration
-                    'ask': fallback_ask,
-                    'bid': round(fallback_ask * 0.8, 2),
-                    'delta': 0.3 if primary_type == 'CALL' else -0.3,
-                    'volume': 1000,
-                    'open_interest': 5000
+                return {
+                    'symbol': symbol,
+                    'error': 'No suitable options contracts found from live data provider',
+                    'recommendation': primary_recommendation,
+                    'analysis': {
+                        'trend': analysis['trend_direction'],
+                        'confidence': analysis['confidence'],
+                        'signals_aligned': analysis['signals_aligned'],
+                        'explanation': analysis['explanation'],
+                        'total_signals': analysis.get('total_signals', 0),
+                        'bullish_signals': analysis.get('bullish_signals', 0),
+                        'bearish_signals': analysis.get('bearish_signals', 0)
+                    },
+                    'note': 'Live options data unavailable - check Tradier API configuration'
                 }
-                
-                # Also create fallback for options_chain display
-                if not best_call_contract:
-                    best_call_contract = {
-                        'symbol': f'{symbol}_CALL_FALLBACK',
-                        'strike': round(current_price * 1.05),
-                        'ask': round(current_price * 0.02, 2),
-                        'bid': round(current_price * 0.016, 2),
-                        'type': 'CALL'
-                    }
-                    
-                if not best_put_contract:
-                    best_put_contract = {
-                        'symbol': f'{symbol}_PUT_FALLBACK', 
-                        'strike': round(current_price * 0.95),
-                        'ask': round(current_price * 0.02, 2),
-                        'bid': round(current_price * 0.016, 2),
-                        'type': 'PUT'
-                    }
             
             # Step 3: Build trade plan for primary recommendation
             trade_plan = self.build_trade_plan(best_contract, analysis)
