@@ -1168,7 +1168,7 @@ def get_intelligent_options_recommendation(symbol: str):
         
         # Create agent and get recommendation
         agent = IntelligentOptionsAgent()
-        recommendation = agent.analyze_and_recommend(symbol)
+        recommendation = agent.generate_recommendation(symbol)
         
         return {
             "status": "success",
