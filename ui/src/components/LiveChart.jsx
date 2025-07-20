@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ComposedChart,
   Line,
@@ -64,6 +64,11 @@ const indicatorColors = {
   'BB_lower': '#0077b6',
   'MACD': '#e63946',
   'RSI': '#2a9d8f'
+};
+
+// Helper function to get indicator color
+const getIndicatorColor = (indicator) => {
+  return indicatorColors[indicator] || '#ffffff';
 };
 
 const LiveChart = ({ data, selectedIndicators, symbol, technicalData }) => {
@@ -155,44 +160,90 @@ const LiveChart = ({ data, selectedIndicators, symbol, technicalData }) => {
 
   return (
     <div className="live-chart-container" style={{ width: '100%', height: '400px' }}>
-      <h3>Live Chart for {symbol}</h3>
+      {/* Title and Indicator Toggles - Side by Side */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '200px', flexWrap: 'nowrap', overflowX: 'auto', width: '100%' }}>
+        {/* Left side - Chart Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h3 style={{ margin: 0, color: 'var(--text-primary)', whiteSpace: 'nowrap', display: 'inline-block' }}>Live Chart for {symbol}</h3>
+        </div>
+        
+        {/* Right side - Indicator Toggles */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>Indicators:</span>
+            <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '8px', alignItems: 'center' }}>
+              {['EMA_9', 'EMA_20', 'EMA_50', 'VWAP', 'BB_upper', 'BB_lower', 'MACD', 'RSI'].map(indicator => (
+            <label key={indicator} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={selectedIndicators.includes(indicator)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    // Add indicator to selectedIndicators
+                    const newIndicators = [...selectedIndicators, indicator];
+                    // Call parent component's handler if available
+                    if (window.updateSelectedIndicators) {
+                      window.updateSelectedIndicators(newIndicators);
+                    }
+                  } else {
+                    // Remove indicator from selectedIndicators
+                    const newIndicators = selectedIndicators.filter(i => i !== indicator);
+                    // Call parent component's handler if available
+                    if (window.updateSelectedIndicators) {
+                      window.updateSelectedIndicators(newIndicators);
+                    }
+                  }
+                }}
+              />
+              <span style={{ color: getIndicatorColor(indicator) }}>{indicator}</span>
+            </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
       {chartData.length === 0 ? (
         <div style={{ padding: '20px', textAlign: 'center' }}>
           <p style={{ color: '#f44336', fontSize: '14px' }}>No chart data available</p>
         </div>
       ) : (
         <>
-          <div style={{ width: '100%', height: '400px', padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+          <div style={{ width: '100%', height: '380px', padding: '15px', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', overflow: 'visible' }}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                width={800}
-                height={400}
                 data={chartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis 
                   dataKey="date" 
                   stroke="#666"
-                  fontSize={10}
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                  interval={Math.floor(chartData.length / 10)}
+                  fontSize={9}
+                  angle={0}
+                  textAnchor="middle"
+                  height={30}
+                  interval={Math.floor(chartData.length / 8)}
+                  tickFormatter={(value) => {
+                    const date = new Date(value);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  }}
                 />
                 <YAxis 
                   yAxisId="price"
                   orientation="left"
                   stroke="#666"
-                  fontSize={12}
-                  domain={['dataMin - 5', 'dataMax + 5']}
+                  fontSize={11}
+                  domain={['dataMin - 1', 'dataMax + 1']}
+                  tickFormatter={(value) => `$${value.toFixed(2)}`}
+                  width={60}
                 />
                 <YAxis 
                   yAxisId="volume"
                   orientation="right"
                   stroke="#999"
-                  fontSize={10}
+                  fontSize={9}
                   domain={[0, 'dataMax']}
+                  hide={true}
                 />
                 <Tooltip 
                   contentStyle={{

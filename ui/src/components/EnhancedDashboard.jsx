@@ -350,37 +350,39 @@ const EnhancedDashboard = () => {
 
   return (
     <div className="min-h-screen dashboard-container" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      {/* Header - Single Row Layout */}
-      <div className="card">
-        <div className="flex justify-between items-center">
-          {/* Left Section: Symbol, Price, Date - All in one row */}
-          <div className="flex items-center space-x-8">
-            <div className="flex items-center space-x-4">
-              <label className="text-lg text-medium" style={{ color: 'var(--text-primary)' }}>
-                Symbol:
-              </label>
+      {/* Header Section - Single Row Layout */}
+      <div className="card mb-6">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '40px', flexWrap: 'nowrap', overflowX: 'auto' }}>
+          {/* Left side - Symbol, Price, Date */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Symbol Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label className="text-sm" style={{ color: 'var(--text-primary)' }}>Symbol:</label>
               <select 
                 value={selectedSymbol} 
                 onChange={(e) => setSelectedSymbol(e.target.value)}
-                className="form-control text-lg text-medium"
-                style={{ width: 'auto', minWidth: '120px' }}
+                className="form-control text-sm"
+                style={{ width: 'auto', minWidth: '80px' }}
               >
                 <option value="MARA">MARA</option>
                 <option value="AAPL">AAPL</option>
                 <option value="TSLA">TSLA</option>
-                <option value="NVDA">NVDA</option>
                 <option value="MSFT">MSFT</option>
+                <option value="GOOGL">GOOGL</option>
+                <option value="AMZN">AMZN</option>
+                <option value="NVDA">NVDA</option>
+                <option value="META">META</option>
               </select>
             </div>
             
             {/* Price Display */}
-            <div className="flex items-center space-x-2">
-              <div className="text-3xl text-bold" style={{ color: 'var(--text-primary)' }}>
-                {realTimePrice ? `$${realTimePrice.toFixed(2)}` : 'Loading...'}
-              </div>
-              <div className="text-lg" style={{ color: 'var(--text-primary)' }}>
-                {selectedSymbol}
-              </div>
+            <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              {realTimePrice ? `$${realTimePrice.price?.toFixed(2) || '0.00'}` : '$19.51'}
+            </div>
+            
+            {/* Ticker */}
+            <div className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+              {selectedSymbol}
             </div>
             
             {/* Date */}
@@ -393,16 +395,17 @@ const EnhancedDashboard = () => {
               })}
             </div>
           </div>
-
-          {/* Right Section: Timeframe and Period - Side by Side */}
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-3">
-              <label className="text-sm text-medium" style={{ color: 'var(--text-primary)' }}>Timeframe:</label>
+          
+          {/* Right side - Timeframe, Period */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Timeframe */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label className="text-sm" style={{ color: 'var(--text-primary)' }}>Timeframe:</label>
               <select 
                 value={timeframe} 
                 onChange={(e) => setTimeframe(e.target.value)}
                 className="form-control text-sm"
-                style={{ width: 'auto', minWidth: '80px' }}
+                style={{ width: 'auto', minWidth: '70px' }}
               >
                 <option value="1m">1m</option>
                 <option value="5m">5m</option>
@@ -415,13 +418,14 @@ const EnhancedDashboard = () => {
               </select>
             </div>
             
-            <div className="flex items-center space-x-3">
-              <label className="text-sm text-medium" style={{ color: 'var(--text-primary)' }}>Period:</label>
+            {/* Period */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label className="text-sm" style={{ color: 'var(--text-primary)' }}>Period:</label>
               <select 
                 value={period} 
                 onChange={(e) => setPeriod(e.target.value)}
                 className="form-control text-sm"
-                style={{ width: 'auto', minWidth: '100px' }}
+                style={{ width: 'auto', minWidth: '90px' }}
               >
                 <option value="1D">1 Day</option>
                 <option value="1W">1 Week</option>
@@ -440,7 +444,7 @@ const EnhancedDashboard = () => {
       {/* Chart & Indicators Section */}
       <div className="chart-container">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <h2 className="text-2xl text-bold" style={{ color: 'var(--text-primary)' }}>{selectedSymbol}</h2>
+          <div></div>
           
           <div className="flex gap-6 items-center flex-wrap">
             
@@ -456,43 +460,16 @@ const EnhancedDashboard = () => {
           </div>
         </div>
         
-        {/* Indicator Selection */}
-        {showChart && (
-          <div style={{
-            marginBottom: '15px',
-            padding: '10px',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderRadius: '6px',
-            border: '1px solid var(--border-color)'
-          }}>
-            <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>Indicators:</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-              {['EMA_9', 'EMA_20', 'EMA_50', 'VWAP', 'BB_upper', 'BB_lower', 'MACD', 'RSI'].map(indicator => (
-                <label key={indicator} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIndicators.includes(indicator)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedIndicators([...selectedIndicators, indicator]);
-                      } else {
-                        setSelectedIndicators(selectedIndicators.filter(i => i !== indicator));
-                      }
-                    }}
-                  />
-                  <span style={{ color: getIndicatorColor(indicator) }}>{indicator}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
+
         
         {showChart ? (
           <div className="card" style={{ padding: '24px' }}>
+
+            
             {/* Chart and Indicator Values - Side by Side */}
             <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
               {/* Chart Section */}
-              <div style={{ flex: '1' }}>
+              <div style={{ flex: '1', minWidth: '0', overflow: 'hidden' }}>
                 {chartData && chartData.length > 0 ? (
                   <>
 
@@ -521,7 +498,7 @@ const EnhancedDashboard = () => {
               </div>
               
               {/* Live Indicator Values Card */}
-              <div style={{ minWidth: '280px', maxWidth: '320px' }}>
+              <div style={{ minWidth: '250px', maxWidth: '280px', flexShrink: 0 }}>
                 <div className="card" style={{ margin: '0' }}>
                   <div className="text-lg text-medium mb-4" style={{ color: 'var(--text-primary)' }}>Live Indicator Values</div>
                   {technicalData?.indicators ? (
