@@ -8,6 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Query
+from contextlib import asynccontextmanager
 from pydantic import BaseModel
 import pandas as pd
 import sqlite3
@@ -49,7 +50,19 @@ def safe_import(module_name, class_or_func_name=None):
         except ImportError:
             return None
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        t = threading.Thread(target=run_alert_monitor_periodically, daemon=True)
+        t.start()
+    except Exception as e:
+        print(f"Alert monitoring disabled: {e}")
+    yield
+    # Shutdown (if needed)
+    pass
+
+app = FastAPI(lifespan=lifespan)
 
 # --- Alpaca Real-Time Data Integration ---
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
@@ -154,12 +167,6 @@ def run_alert_monitor_periodically():
         # Alert monitoring is optional - skip if not available
         print("Alert monitoring disabled - alerts module not found")
         return
-
-@app.on_event("startup")
-def start_alert_monitor():
-    t = threading.Thread(target=run_alert_monitor_periodically, daemon=True)
-    t.start()
-
 
 # --- CORS middleware for Netlify frontend ---
 from fastapi.middleware.cors import CORSMiddleware
