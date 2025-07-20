@@ -454,7 +454,8 @@ class IntelligentOptionsAgent:
     
     def generate_recommendation(self, symbol: str) -> Dict:
         """
-        STEP 4: Generate Complete Trading Recommendation
+        STEP 4: Generate Complete Trading Recommendation with Options Chain Data
+        Always provides best CALL and PUT options regardless of signal strength
         """
         try:
             # Step 1: Analyze chart
@@ -462,43 +463,77 @@ class IntelligentOptionsAgent:
             if 'error' in analysis:
                 return analysis
             
-            # Check if we should trade
-            if analysis['recommendation'] == 'WAIT':
+            # Step 2: Always get options chain data for both CALL and PUT
+            call_options = self.get_options_chain_tradier(symbol, 'call')
+            put_options = self.get_options_chain_tradier(symbol, 'put')
+            
+            # Determine primary recommendation based on analysis
+            primary_recommendation = analysis['recommendation']
+            if primary_recommendation == 'CALL':
+                primary_options = call_options
+                primary_type = 'CALL'
+            elif primary_recommendation == 'PUT':
+                primary_options = put_options
+                primary_type = 'PUT'
+            else:
+                # For WAIT/NEUTRAL, provide both options but default to CALL
+                primary_options = call_options if call_options.get('contracts') else put_options
+                primary_type = 'CALL' if call_options.get('contracts') else 'PUT'
+                primary_recommendation = primary_type  # Override WAIT with actionable recommendation
+            
+            # Get best contracts for both directions
+            best_call_contract = call_options.get('contracts', [{}])[0] if call_options.get('contracts') else None
+            best_put_contract = put_options.get('contracts', [{}])[0] if put_options.get('contracts') else None
+            
+            # Select primary contract
+            if primary_type == 'CALL' and best_call_contract:
+                best_contract = best_call_contract
+            elif primary_type == 'PUT' and best_put_contract:
+                best_contract = best_put_contract
+            else:
+                # Fallback to whichever is available
+                best_contract = best_call_contract or best_put_contract
+            
+            if not best_contract:
                 return {
                     'symbol': symbol,
-                    'recommendation': 'WAIT',
-                    'reason': 'Market conditions not favorable for options trading',
-                    'confidence': analysis['confidence'],
-                    'explanation': analysis['explanation']
+                    'error': 'No suitable options contracts found',
+                    'analysis': {
+                        'trend': analysis['trend_direction'],
+                        'confidence': analysis['confidence'],
+                        'signals_aligned': analysis['signals_aligned'],
+                        'explanation': analysis['explanation']
+                    }
                 }
             
-            # Step 2: Get options chain
-            option_type = analysis['recommendation'].lower()  # 'call' or 'put'
-            options_data = self.get_options_chain_tradier(symbol, option_type)
-            
-            if 'error' in options_data or not options_data.get('contracts'):
-                return {
-                    'symbol': symbol,
-                    'error': 'No suitable options contracts found'
-                }
-            
-            # Select best contract
-            best_contract = options_data['contracts'][0]
-            
-            # Step 3: Build trade plan
+            # Step 3: Build trade plan for primary recommendation
             trade_plan = self.build_trade_plan(best_contract, analysis)
             
-            # Step 4: Format recommendation
+            # Step 4: Format comprehensive recommendation with options chain
             return {
                 'symbol': symbol,
-                'recommendation': analysis['recommendation'],
+                'recommendation': primary_recommendation,
                 'contract': best_contract,
                 'trade_plan': trade_plan,
+                'options_chain': {
+                    'call_options': {
+                        'best_contract': best_call_contract,
+                        'total_contracts': len(call_options.get('contracts', [])),
+                        'available': bool(call_options.get('contracts'))
+                    },
+                    'put_options': {
+                        'best_contract': best_put_contract,
+                        'total_contracts': len(put_options.get('contracts', [])),
+                        'available': bool(put_options.get('contracts'))
+                    }
+                },
                 'analysis': {
                     'trend': analysis['trend_direction'],
                     'confidence': analysis['confidence'],
                     'signals_aligned': analysis['signals_aligned'],
-                    'explanation': analysis['explanation']
+                    'explanation': analysis['explanation'],
+                    'analysis_date': analysis.get('analysis_date'),
+                    'last_trading_day': analysis.get('last_trading_day')
                 },
                 'timestamp': datetime.now().isoformat()
             }
