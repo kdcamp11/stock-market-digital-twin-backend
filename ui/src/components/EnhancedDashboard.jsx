@@ -355,14 +355,27 @@ const EnhancedDashboard = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '40px', flexWrap: 'nowrap', overflowX: 'auto' }}>
           {/* Left side - Symbol, Price, Date */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Symbol Selector */}
+            {/* Symbol Search */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <label className="text-sm" style={{ color: 'var(--text-primary)' }}>Symbol:</label>
+              <input
+                type="text"
+                value={selectedSymbol}
+                onChange={(e) => setSelectedSymbol(e.target.value.toUpperCase())}
+                placeholder="Enter symbol..."
+                className="form-control text-sm"
+                style={{ width: '120px', minWidth: '80px' }}
+              />
+            </div>
+            
+            {/* Quick Symbol Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Quick:</span>
               <select 
                 value={selectedSymbol} 
                 onChange={(e) => setSelectedSymbol(e.target.value)}
-                className="form-control text-sm"
-                style={{ width: 'auto', minWidth: '80px' }}
+                className="form-control text-xs"
+                style={{ width: 'auto', minWidth: '60px', fontSize: '12px' }}
               >
                 <option value="MARA">MARA</option>
                 <option value="AAPL">AAPL</option>

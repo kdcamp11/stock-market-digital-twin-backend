@@ -13,8 +13,45 @@ const AgentChatPanel = () => {
 
   // Extract ticker symbols from question
   const extractSymbols = (text) => {
-    const matches = text.match(/\b[A-Z]{1,5}\b/g);
-    return matches ? [...new Set(matches)] : [];
+    const symbolPattern = /\b[A-Z]{1,5}\b/g;
+    return text.match(symbolPattern) || [];
+  };
+
+  const generateMockAgentResponse = (question) => {
+    const lowerQuestion = question.toLowerCase();
+    const symbols = extractSymbols(question);
+    const symbol = symbols[0] || 'the stock';
+    
+    if (lowerQuestion.includes('buy') || lowerQuestion.includes('should i')) {
+      return {
+        message: `Based on current market analysis, ${symbol} shows mixed signals. Consider technical indicators like RSI, MACD, and volume before making investment decisions. This is a demo response - connect to live backend for real-time analysis.`,
+        recommendation: 'WAIT',
+        confidence: 0.6
+      };
+    }
+    
+    if (lowerQuestion.includes('price') || lowerQuestion.includes('target')) {
+      return {
+        message: `${symbol} is currently trading with moderate volatility. Key support and resistance levels should be monitored. This is a demo response - connect to live backend for real-time price analysis.`,
+        recommendation: 'MONITOR',
+        confidence: 0.5
+      };
+    }
+    
+    if (lowerQuestion.includes('technical') || lowerQuestion.includes('analysis')) {
+      return {
+        message: `Technical analysis for ${symbol} suggests reviewing multiple timeframes and indicators. RSI, MACD, and moving averages provide comprehensive insights. This is a demo response - connect to live backend for detailed technical analysis.`,
+        recommendation: 'ANALYZE',
+        confidence: 0.7
+      };
+    }
+    
+    // Default response
+    return {
+      message: `I understand you're asking about ${symbol}. While I'm currently running in demo mode, I can help analyze stocks, provide technical insights, and suggest trading strategies. Connect to the live backend for real-time market analysis.`,
+      recommendation: 'DEMO_MODE',
+      confidence: 0.5
+    };
   };
 
   useEffect(() => {
@@ -41,11 +78,15 @@ const AgentChatPanel = () => {
       setChatHistory(prev => [...prev, agentMessage]);
       setResponse(response.data);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Agent API error:', error);
+      
+      // Enhanced fallback with intelligent mock responses
+      const mockResponse = generateMockAgentResponse(question);
       const errorMessage = { 
         type: 'agent', 
-        content: { error: 'Failed to get response from agent' }, 
-        timestamp: new Date() 
+        content: mockResponse, 
+        timestamp: new Date(),
+        symbols: extractSymbols(question)
       };
       setChatHistory(prev => [...prev, errorMessage]);
     }
