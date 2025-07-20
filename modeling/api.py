@@ -1230,10 +1230,16 @@ def get_comprehensive_signals(symbol: str):
         symbol = symbol.upper().strip()
         
         # Import the comprehensive signals analysis function
-        from modeling.intelligent_options_agent import get_comprehensive_signals_analysis
+        try:
+            from modeling.intelligent_options_agent import get_comprehensive_signals_analysis
+        except ImportError:
+            # Fallback for direct execution
+            from intelligent_options_agent import get_comprehensive_signals_analysis
         
         # Get comprehensive signals analysis
+        print(f"DEBUG API: Calling get_comprehensive_signals_analysis for {symbol}")
         analysis = get_comprehensive_signals_analysis(symbol)
+        print(f"DEBUG API: Analysis result: {analysis}")
         
         if 'error' in analysis:
             return {
