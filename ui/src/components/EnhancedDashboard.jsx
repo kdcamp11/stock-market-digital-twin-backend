@@ -272,39 +272,23 @@ const EnhancedDashboard = () => {
           }
         }
 
-        // Load trade recommendation (realistic pricing based on market data)
-        console.log('Live Dashboard: Generating realistic options data for', selectedSymbol);
-        const currentPrice = technicalData?.indicators?.Current_Price || chartData[chartData.length - 1]?.close || 20;
-        const rsi = technicalData?.indicators?.RSI || 50;
-        
-        // Calculate realistic options pricing based on current market conditions
-        const nearestFridayExpiration = () => {
-          const today = new Date();
-          const daysUntilFriday = (5 - today.getDay() + 7) % 7 || 7; // Next Friday
-          const nextFriday = new Date(today.getTime() + daysUntilFriday * 24 * 60 * 60 * 1000);
-          return nextFriday.toISOString().split('T')[0];
-        };
-        
-        // More realistic strike and premium calculation
-        const atm_strike = Math.round(currentPrice); // At-the-money
-        const otm_strike = atm_strike + 1; // $1 out-of-the-money
-        const timeToExpiry = 6; // days
-        
-        // Realistic premium calculation (simplified Black-Scholes approximation)
-        const intrinsicValue = Math.max(0, currentPrice - otm_strike);
-        const timeValue = Math.max(0.05, (otm_strike - currentPrice) * 0.1 * (timeToExpiry / 30)); // Time decay
-        const volatilityPremium = Math.abs(rsi - 50) * 0.01; // RSI-based volatility
-        const realisticPremium = (intrinsicValue + timeValue + volatilityPremium).toFixed(2);
-        
-        // Calculate realistic bid/ask spread for options
-        const premiumValue = parseFloat(realisticPremium);
-        const bidAskSpread = Math.max(0.01, premiumValue * 0.05); // 5% spread, minimum 1 cent
-        const bid = Math.max(0.01, premiumValue - bidAskSpread / 2).toFixed(2);
-        const ask = (premiumValue + bidAskSpread / 2).toFixed(2);
-        const midPrice = ((parseFloat(bid) + parseFloat(ask)) / 2).toFixed(2);
-        
-        setTradeRecommendation(null);
-        console.log('Live Dashboard: No options data available - backend connection required');
+        // Load trade recommendation from backend API
+        console.log('Live Dashboard: Fetching live options data for', selectedSymbol);
+        try {
+          const optionsResponse = await fetch(buildApiUrl(`/api/intelligent-options/${selectedSymbol}`));
+          const optionsResult = await optionsResponse.json();
+          
+          if (optionsResult.status === 'success' && optionsResult.recommendation) {
+            setTradeRecommendation(optionsResult.recommendation);
+            console.log('Live Dashboard: Options data loaded:', optionsResult.recommendation);
+          } else {
+            console.log('Live Dashboard: Options API failed:', optionsResult.message || 'Unknown error');
+            setTradeRecommendation(null);
+          }
+        } catch (optionsError) {
+          console.error('Live Dashboard: Options API error:', optionsError);
+          setTradeRecommendation(null);
+        }
       } catch (error) {
         console.log('Data loading error:', error);
         // Set fallback data

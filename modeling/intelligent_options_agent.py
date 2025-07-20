@@ -34,22 +34,43 @@ class IntelligentOptionsAgent:
         self.max_ask = 3.50
         self.min_open_interest = 1000
         
+    def _get_last_trading_day(self) -> str:
+        """
+        Get the last active trading day (skip weekends and holidays)
+        Returns date string in YYYY-MM-DD format
+        """
+        from datetime import datetime, timedelta
+        
+        today = datetime.now()
+        
+        # Go back day by day until we find a weekday
+        current_date = today
+        while current_date.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
+            current_date -= timedelta(days=1)
+        
+        # For simplicity, assume weekdays are trading days
+        # In production, you'd check against a holiday calendar
+        return current_date.strftime('%Y-%m-%d')
+    
     def analyze_stock_chart(self, symbol: str, timeframe: str = '1D') -> Dict:
         """
         STEP 1: Analyze Stock Chart via Alpaca API
-        Returns trend analysis and indicator signals
+        Returns trend analysis and indicator signals based on last trading day
         """
         try:
-            # Get OHLCV data from database
+            # Get last trading day for analysis
+            last_trading_day = self._get_last_trading_day()
+            
+            # Get OHLCV data from database up to last trading day
             conn = sqlite3.connect('data_ingestion/stocks.db')
             query = '''
             SELECT Date, Open, High, Low, Close, Volume 
             FROM stock_prices 
-            WHERE Symbol = ? 
+            WHERE Symbol = ? AND Date <= ?
             ORDER BY Date DESC 
             LIMIT 200
             '''
-            df = pd.read_sql_query(query, conn, params=(symbol,))
+            df = pd.read_sql_query(query, conn, params=(symbol, last_trading_day))
             conn.close()
             
             if df.empty:
@@ -74,6 +95,9 @@ class IntelligentOptionsAgent:
             # Analyze price action
             price_action = self._analyze_price_action(df)
             
+            # Get the actual date of the data being analyzed
+            analysis_date = df['Date'].iloc[-1] if not df.empty else last_trading_day
+            
             return {
                 'symbol': symbol,
                 'current_price': float(df['Close'].iloc[-1]),
@@ -85,7 +109,9 @@ class IntelligentOptionsAgent:
                 'support_resistance': sr_levels,
                 'price_action': price_action,
                 'signals_aligned': analysis['signals_aligned'],
-                'explanation': analysis['explanation']
+                'explanation': analysis['explanation'],
+                'analysis_date': analysis_date,
+                'last_trading_day': last_trading_day
             }
             
         except Exception as e:
