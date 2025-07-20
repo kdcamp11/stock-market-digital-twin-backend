@@ -236,14 +236,22 @@ class IntelligentOptionsAgent:
                 confidence = 0
             else:
                 bullish_pct = bullish_signals / total_signals
-                if bullish_pct >= 0.7:
+                if bullish_pct >= 0.55:  
                     trend = 'BULLISH'
                     recommendation = 'CALL'
                     confidence = min(5, int(bullish_signals))
-                elif bullish_pct <= 0.3:
+                elif bullish_pct <= 0.45:  
                     trend = 'BEARISH'
                     recommendation = 'PUT'
                     confidence = min(5, int(bearish_signals))
+                elif bullish_signals > bearish_signals and bullish_signals >= 1:
+                    trend = 'BULLISH'
+                    recommendation = 'CALL'
+                    confidence = min(3, int(bullish_signals))
+                elif bearish_signals > bullish_signals and bearish_signals >= 1:
+                    trend = 'BEARISH'
+                    recommendation = 'PUT'
+                    confidence = min(3, int(bearish_signals))
                 else:
                     trend = 'NEUTRAL'
                     recommendation = 'WAIT'
