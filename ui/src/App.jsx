@@ -1,10 +1,9 @@
 import React from 'react';
 import { CssBaseline, AppBar, Toolbar, Typography, Box, Tabs, Tab } from '@mui/material';
 import DashboardPanel from './components/DashboardPanel';
+import EnhancedDashboard from './components/EnhancedDashboard';
 import AlertsPanel from './components/AlertsPanel';
-import StrategyPanel from './components/StrategyPanel';
 import AgentChatPanel from './components/AgentChatPanel';
-import TechnicalAnalysisPanel from './components/TechnicalAnalysisPanel';
 
 function a11yProps(index) {
   return {
@@ -34,9 +33,9 @@ export default function App() {
   return (
     <Box sx={{ flexGrow: 1 }}>
       <CssBaseline />
-      <AppBar position="static">
+      <AppBar position="static" sx={{ backgroundColor: 'var(--bg-secondary)', boxShadow: 'none', borderBottom: '1px solid var(--border-primary)' }}>
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" sx={{ flexGrow: 1, color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>
             Stock Market Digital Twin
           </Typography>
         </Toolbar>
@@ -49,27 +48,36 @@ export default function App() {
         variant="scrollable"
         scrollButtons="auto"
         aria-label="Main Tabs"
+        sx={{
+          backgroundColor: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-primary)',
+          '& .MuiTab-root': {
+            color: 'var(--text-secondary)',
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 500,
+            textTransform: 'none',
+            fontSize: '14px',
+            '&.Mui-selected': {
+              color: 'var(--text-primary)'
+            },
+            '&:hover': {
+              color: 'var(--text-primary)',
+              backgroundColor: 'var(--bg-tertiary)'
+            }
+          },
+          '& .MuiTabs-indicator': {
+            backgroundColor: 'var(--accent-primary)'
+          }
+        }}
       >
         <Tab label="Live Dashboard" {...a11yProps(0)} />
         <Tab label="Alerts Log" {...a11yProps(1)} />
-        <Tab label="Strategy Testing" {...a11yProps(2)} />
-        <Tab label="Agent Chat" {...a11yProps(3)} />
-        <Tab label="Technical Analysis" {...a11yProps(4)} />
       </Tabs>
       <TabPanel value={tab} index={0}>
-        <DashboardPanel />
+        <EnhancedDashboard />
       </TabPanel>
       <TabPanel value={tab} index={1}>
         <AlertsPanel />
-      </TabPanel>
-      <TabPanel value={tab} index={2}>
-        <StrategyPanel />
-      </TabPanel>
-      <TabPanel value={tab} index={3}>
-        <AgentChatPanel />
-      </TabPanel>
-      <TabPanel value={tab} index={4}>
-        <TechnicalAnalysisPanel />
       </TabPanel>
     </Box>
   );

@@ -140,17 +140,14 @@ const AgentChatPanel = () => {
                 <div>
                   <div style={{ marginBottom: '8px' }}>
                     <span style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
                       fontSize: '12px',
                       fontWeight: 'bold',
-                      backgroundColor: 
-                        message.content.decision === 'buy' ? '#d4edda' :
-                        message.content.decision === 'sell' ? '#f8d7da' : '#fff3cd',
-                      color:
-                        message.content.decision === 'buy' ? '#155724' :
-                        message.content.decision === 'sell' ? '#721c24' : '#856404'
+                      backgroundColor:
+                        message.content.decision === 'buy' ? 'var(--accent-secondary)' :
+                        message.content.decision === 'sell' ? 'var(--accent-danger)' : 'var(--bg-tertiary)',
+                      color: 'var(--text-primary)'
                     }}>
                       {message.content.decision?.toUpperCase() || 'WAIT'}
                     </span>
