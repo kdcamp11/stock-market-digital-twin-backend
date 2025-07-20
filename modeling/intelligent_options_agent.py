@@ -74,7 +74,10 @@ class IntelligentOptionsAgent:
             conn.close()
             
             if df.empty:
-                return {'error': f'No data found for {symbol}'}
+                print(f"DEBUG: No data found in database for {symbol}")
+                print(f"DEBUG: Database query: {query}")
+                print(f"DEBUG: Query params: {(symbol, last_trading_day)}")
+                return {'error': f'No data found for {symbol} in database. Please ensure data is ingested.'}
             
             # Reverse to chronological order for technical analysis
             df = df.sort_values('Date').reset_index(drop=True)
@@ -595,9 +598,14 @@ def get_intelligent_options_recommendation(symbol: str) -> Dict:
 def get_comprehensive_signals_analysis(symbol: str) -> Dict:
     """Get comprehensive signals analysis for both Active Signals and Options Analysis panels"""
     try:
+        print(f"DEBUG: Starting comprehensive signals analysis for {symbol}")
+        
         # Step 1: Analyze chart to get all signals
         analysis = intelligent_agent.analyze_stock_chart(symbol)
+        print(f"DEBUG: Chart analysis result: {analysis}")
+        
         if 'error' in analysis:
+            print(f"DEBUG: Chart analysis error: {analysis['error']}")
             return analysis
         
         # Step 2: Format comprehensive signals response
