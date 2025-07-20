@@ -203,36 +203,18 @@ const TradeRecommendationCard = ({ symbol }) => {
     );
   }
 
-  // Handle WAIT recommendation
-  if (recommendation.recommendation === 'WAIT') {
-    return (
-      <div className="card">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl text-bold" style={{ color: 'var(--text-primary)' }}>{recommendation.symbol}</h3>
-          <div className="badge badge-secondary">
-            WAIT
-          </div>
-        </div>
-        
-        <div className="text-base text-medium mb-3" style={{ color: 'var(--text-primary)' }}>
-          Market conditions not favorable for options trading
-        </div>
-        
-        <div className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text-secondary)' }}>
-          {recommendation.explanation || 'Insufficient signal alignment for confident trade entry'}
-        </div>
-        
-        <div className="rounded-lg p-3 text-xs" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-          <span className="text-medium" style={{ color: 'var(--text-primary)' }}>Confidence:</span> 
-          <span className="ml-2" style={{ color: 'var(--text-secondary)' }}>{getConfidenceStars(recommendation.confidence)} ({recommendation.confidence}/5)</span>
-        </div>
-      </div>
-    );
-  }
+  // Backend now always provides actionable recommendations, no more WAIT blocking
+  // Remove the WAIT blocking logic and always display options data
 
-  // Handle CALL/PUT recommendation with full trade plan
-  const { contract, trade_plan, analysis } = recommendation;
+  // Handle CALL/PUT recommendation with comprehensive options data
+  const { contract, trade_plan, analysis, options_chain } = recommendation;
   const recColor = getRecommendationColor(recommendation.recommendation);
+  
+  // Extract options chain data
+  const callOptions = options_chain?.call_options;
+  const putOptions = options_chain?.put_options;
+  const bestCallContract = callOptions?.best_contract;
+  const bestPutContract = putOptions?.best_contract;
 
   return (
     <div className="card">
@@ -252,10 +234,10 @@ const TradeRecommendationCard = ({ symbol }) => {
         </div>
       </div>
 
-      {/* Contract Details */}
+      {/* Primary Contract Details */}
       <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
         <div className="text-lg text-medium mb-3" style={{ color: 'var(--text-primary)' }}>
-          Contract Details
+          Recommended Contract ({recommendation.recommendation})
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div style={{ color: 'var(--text-primary)' }}><span className="text-medium">Strike:</span> ${contract?.strike}</div>
@@ -263,13 +245,43 @@ const TradeRecommendationCard = ({ symbol }) => {
           <div style={{ color: 'var(--text-primary)' }}><span className="text-medium">Expiration:</span> {contract?.expiration}</div>
           <div style={{ color: 'var(--text-primary)' }}><span className="text-medium">Delta:</span> {contract?.delta}</div>
           <div style={{ color: 'var(--text-primary)' }}><span className="text-medium">Volume:</span> {contract?.volume?.toLocaleString()}</div>
-          <div style={{ color: 'var(--text-primary)' }}><span className="text-medium">Open Interest:</span> {contract?.openInterest?.toLocaleString()}</div>
+          <div style={{ color: 'var(--text-primary)' }}><span className="text-medium">Open Interest:</span> {contract?.open_interest?.toLocaleString()}</div>
           {/* Bid/Ask Pricing */}
           <div style={{ color: 'var(--text-primary)' }}><span className="text-medium">Bid:</span> <span style={{ color: '#f87171' }}>${contract?.bid}</span></div>
           <div style={{ color: 'var(--text-primary)' }}><span className="text-medium">Ask:</span> <span style={{ color: '#4ade80' }}>${contract?.ask}</span></div>
-          <div className="col-span-2" style={{ color: 'var(--text-primary)' }}><span className="text-medium">Mid Price:</span> <span style={{ color: '#fbbf24' }}>${contract?.premium}</span></div>
+          <div className="col-span-2" style={{ color: 'var(--text-primary)' }}><span className="text-medium">Mid Price:</span> <span style={{ color: '#fbbf24' }}>${((contract?.bid + contract?.ask) / 2)?.toFixed(2)}</span></div>
         </div>
       </div>
+
+      {/* Options Chain Summary */}
+      {(bestCallContract || bestPutContract) && (
+        <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+          <div className="text-lg text-medium mb-3" style={{ color: 'var(--text-primary)' }}>
+            Options Chain Available
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {/* CALL Options */}
+            {bestCallContract && (
+              <div className="rounded p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                <div className="text-sm text-medium mb-2" style={{ color: '#4ade80' }}>CALL Options</div>
+                <div className="text-xs" style={{ color: 'var(--text-primary)' }}>Strike: ${bestCallContract.strike}</div>
+                <div className="text-xs" style={{ color: 'var(--text-primary)' }}>Ask: ${bestCallContract.ask}</div>
+                <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Available: {callOptions?.total_contracts} contracts</div>
+              </div>
+            )}
+            
+            {/* PUT Options */}
+            {bestPutContract && (
+              <div className="rounded p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                <div className="text-sm text-medium mb-2" style={{ color: '#f87171' }}>PUT Options</div>
+                <div className="text-xs" style={{ color: 'var(--text-primary)' }}>Strike: ${bestPutContract.strike}</div>
+                <div className="text-xs" style={{ color: 'var(--text-primary)' }}>Ask: ${bestPutContract.ask}</div>
+                <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Available: {putOptions?.total_contracts} contracts</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Trade Plan */}
       <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
